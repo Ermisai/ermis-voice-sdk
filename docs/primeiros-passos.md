@@ -2,6 +2,8 @@
 
 Este guia leva você da instalação até um atendente atendendo o telefone. Cada passo funciona sozinho: no passo 3 você já ouve o agente, sem telefone e sem navegador.
 
+Se preferir que um assistente de IA escreva o primeiro agente, use o [prompt pronto](prompt-para-ia.md): descreva o seu negócio e receba o código com testes. Este guia continua útil para entender e ajustar o que ele gerar.
+
 | Passo | O que você faz | Tempo |
 |---|---|---|
 | [1. Prepare o ambiente](#1-prepare-o-ambiente) | Python, chave e URL | 2 min |

@@ -1,0 +1,24 @@
+# Ermis Voice SDK para Python
+
+> SDK Python (pacote `ermis-voice`, importado como `ermis`) da Ermis Voice API: um agente de voz em tempo real para ligações por telefone (Twilio), navegador ou WebSocket. A API detecta a fala, transcreve, classifica a intenção, fala com voz natural e para quando o cliente interrompe; o seu servidor recebe eventos (`Transcript`, `Decision`) e responde com comandos (`speak`, `decide`, `extract_slot`, `end`). Em prévia (0.2.0a1): nomes e campos podem mudar.
+
+Use somente as classes e os métodos documentados nos links abaixo. A chave (`ERMIS_API_KEY`) fica só no servidor; a URL da API vem de `ERMIS_API_URL`. Respostas do agente são faladas: curtas, sem markdown.
+
+## Documentação
+
+- [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a um número de telefone atendido pelo agente, com o laço de eventos e a lista de conferência para produção
+- [README e referência do SDK](https://github.com/Ermisai/ermis-voice-sdk/blob/main/README.md): `Ermis`, `Session`, `Call`, eventos, opções e exceções
+- [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, áudio e erros
+- [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): prompt completo para gerar um agente com testes
+
+## Exemplos
+
+- [primeira_ligacao.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/primeira_ligacao.py): fala com o agente sem telefone, enviando um WAV gravado
+- [atendente_twilio.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py): atendente geral pelo Twilio
+- [agendamento.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py): marcar, remarcar e cancelar consultas
+- [ura.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py): URA por voz com transferência por setor
+
+## Opcional
+
+- [Testes dos exemplos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/tests/test_example_flows.py): uma Voice API simulada para testar agentes sem telefone
+- [Changelog](https://github.com/Ermisai/ermis-voice-sdk/blob/main/CHANGELOG.md)

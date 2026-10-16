@@ -8,6 +8,8 @@ O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o c
 
 **Novo por aqui?** O guia [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md) leva você da instalação a um número de telefone atendido pelo agente. No terceiro passo você já ouve o agente, sem telefone e sem navegador.
 
+**Prefere começar com um assistente de IA?** Cole o [prompt pronto](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md) no Claude, ChatGPT ou Cursor, descreva o seu negócio e receba o agente com testes.
+
 ## Como funciona
 
 ```mermaid
@@ -235,6 +237,7 @@ O mesmo erro chega como status HTTP ou código de fechamento do WebSocket; o SDK
 ## Documentação
 
 - [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a uma ligação de verdade, com lista de conferência para produção.
+- [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): gere um agente com o seu assistente de código. Para assistentes que leem a documentação sozinhos, há também o [`llms.txt`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/llms.txt).
 - [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): sessões, canal de controle, decisões, mensagens de espera, áudio e erros.
 - Na plataforma da Ermis: **Documentação API → Ermis Voice** e a aba **Ligação** da Área de Teste, para conversar com o agente pelo microfone.
 

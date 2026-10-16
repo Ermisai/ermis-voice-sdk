@@ -5,6 +5,7 @@
 - Guia [Primeiros passos](docs/primeiros-passos.md), da instalação a um número de telefone atendido pelo agente.
 - Exemplos novos: `primeira_ligacao.py` (sem telefone, com um WAV gravado), `agendamento.py` (consultas) e `ura.py` (URA por voz com transferência).
 - Diagramas do fluxo no README.
+- [Prompt para assistentes de IA](docs/prompt-para-ia.md) e `llms.txt`.
 
 ## 0.2.0a1 (prévia)
 
