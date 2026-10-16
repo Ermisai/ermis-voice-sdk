@@ -1,0 +1,183 @@
+# Primeiros passos: do zero a uma ligação com o agente de voz
+
+Este guia leva você da instalação até um atendente atendendo o telefone. Cada passo funciona sozinho: no passo 3 você já ouve o agente, sem telefone e sem navegador.
+
+| Passo | O que você faz | Tempo |
+|---|---|---|
+| [1. Prepare o ambiente](#1-prepare-o-ambiente) | Python, chave e URL | 2 min |
+| [2. Instale o SDK](#2-instale-o-sdk) | `pip install ermis-voice` | 1 min |
+| [3. Primeira ligação, sem telefone](#3-primeira-ligação-sem-telefone) | Um script fala com o agente e salva a resposta | 5 min |
+| [4. Entenda o loop de eventos](#4-entenda-o-loop-de-eventos) | O que chega e o que responder | 5 min |
+| [5. Coloque a sua lógica](#5-coloque-a-sua-lógica) | Roteiro, IA, dados ditados | — |
+| [6. Ligação de verdade pelo Twilio](#6-ligação-de-verdade-pelo-twilio) | Um número de telefone atendido pelo agente | 15 min |
+| [7. Ligação pelo navegador](#7-ligação-pelo-navegador) | Um botão "Ligar" no seu site | — |
+| [8. Antes de ir para produção](#8-antes-de-ir-para-produção) | Lista de conferência | — |
+
+## Como as peças se encaixam
+
+```mermaid
+flowchart LR
+    cliente(["Cliente final"]) <-->|voz| origem["Twilio ou navegador"]
+    origem <-->|"áudio (audio_url)"| api
+    subgraph api ["Ermis Voice API · servidores da Ermis"]
+        direction TB
+        ouve["Detecta fala e interrupção"] --> transcreve["Transcreve e avalia"]
+        transcreve --> decide["Decide a intenção"]
+        fala["Fala com voz natural"]
+        espera["Frases de espera"]
+    end
+    api <-->|"eventos e comandos (control_url)"| sdk
+    subgraph backend ["Seu servidor · guarda a chave"]
+        sdk["SDK ermis"] <-->|objetos Python| codigo["Seu código e sua IA"]
+    end
+```
+
+O áudio nunca passa pelo seu servidor: ele vai do telefone (ou do navegador) direto para a Ermis. Pelo SDK passam só os eventos ("o cliente disse X e quer Y") e os comandos ("fale Z"). Quem escolhe a resposta é você.
+
+## 1. Prepare o ambiente
+
+- **Python 3.10 ou mais novo.** Confira com `python --version`.
+- **Chave e URL do Ermis Voice.** Durante a prévia, a equipe da Ermis entrega as duas. A chave fica **só no seu servidor**: nunca no navegador, no app ou no repositório.
+
+```bash
+export ERMIS_API_KEY="..."   # chave do Ermis Voice
+export ERMIS_API_URL="..."   # URL do Ermis Voice
+```
+
+## 2. Instale o SDK
+
+```bash
+pip install ermis-voice
+python -c "import ermis; print(ermis.__version__)"
+```
+
+O pacote se chama `ermis-voice` no pip e é importado como `ermis`.
+
+## 3. Primeira ligação, sem telefone
+
+O exemplo [`examples/primeira_ligacao.py`](../examples/primeira_ligacao.py) faz o papel do telefone: envia uma fala gravada como se fosse o cliente, conduz a conversa e salva tudo o que o agente falou em `resposta.wav`.
+
+1. Grave uma frase curta em WAV, no celular ou no computador. Por exemplo: "quero a segunda via do boleto".
+2. Rode:
+
+```bash
+python primeira_ligacao.py minha_fala.wav
+```
+
+Você vai ver algo assim:
+
+```text
+sessão vs_8f2c1a
+cliente: 'quero a segunda via do boleto'  (412 ms)
+decisão: intent=question_service action=escalate encerrar=False
+agente: 'Entendi: quero a segunda via do boleto. Vou verificar isso para você. Até logo!'
+fim: client, 9 s cobrados
+resposta.wav: 7.8 s com tudo o que o agente falou
+```
+
+3. Ouça `resposta.wav`: a saudação e a resposta do agente, na voz da Ermis.
+
+Nesse exemplo, o seu código está todo na função `responder()`. Mude o texto, rode de novo e ouça a diferença.
+
+## 4. Entenda o loop de eventos
+
+Toda ligação é o mesmo laço: a Ermis manda eventos, o seu código responde com comandos.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente final
+    participant E as Ermis Voice API
+    participant S as Seu servidor (SDK)
+    S->>E: sessions.create()
+    E-->>S: Session (audio_url, control_url, session_token)
+    C->>E: o áudio conecta (Twilio ou navegador)
+    E-->>S: SessionStarted
+    S->>E: speak("Olá! Como posso ajudar?")
+    E->>C: voz do agente
+    C->>E: "quero marcar uma consulta"
+    E-->>S: Transcript + Decision
+    Note over S: seu roteiro ou sua IA escolhe a resposta
+    E->>C: "Um momento" (se a resposta demorar)
+    S->>E: speak("Claro! Para qual dia?")
+    E->>C: voz do agente (para se o cliente interromper)
+    S->>E: end() depois da despedida
+    E-->>S: SessionEnded (segundos cobrados)
+```
+
+| Evento | Quando chega | O que fazer |
+|---|---|---|
+| `SessionStarted` | O áudio conectou | Fale a saudação com `speak(..., calibrate=True)` |
+| `Transcript` | O cliente terminou de falar | Se `assessment.ignore`, chame `done_processing()`. Se não for `usable`, peça para repetir. Se `confirm`, confirme o que entendeu |
+| `Decision` | Logo depois do `Transcript` | Responda com `speak()`. Se `is_escape`, despeça-se (ou transfira) e chame `end()` |
+| `SpeakDone` | O agente terminou uma fala | Útil para encerrar depois da despedida |
+| `BargeIn` | O cliente interrompeu o agente | Nada: a Ermis já parou de falar e está ouvindo |
+| `WaitingSpoken` | A Ermis falou uma frase de espera | Nada: é aviso |
+| `SessionEnded` | A ligação acabou | Registre o que precisar |
+
+## 5. Coloque a sua lógica
+
+Três formas de escolher a resposta, que você pode misturar:
+
+- **Frases prontas pela intenção.** `Decision.intent` já diz se é cumprimento, agradecimento, reclamação, pedido de atendente... Para `action == "respond"`, uma frase pronta é mais rápida que qualquer IA.
+- **Intenções do seu negócio.** `await call.decide(texto, custom_intents=[CustomIntent("marcar", "Marcar consulta", "...")])` devolve a chave escolhida em `custom_intent`. É assim que o exemplo de URA escolhe o setor.
+- **A sua IA.** Envie o histórico para o seu modelo e fale a resposta. Se demorar, a Ermis fala "Um momento" sozinha; se você sabe que vai demorar, avise com `await call.thinking("Vou consultar o seu pedido.")`.
+
+Para dados ditados, use `extract_slot`: "maria arroba gmail ponto com" vira `maria@gmail.com`, "onze nove oito..." vira um telefone formatado.
+
+```python
+email = await call.extract_slot(texto, "email", type="email")
+if email.found:
+    await call.speak(f"Vou enviar para {email.value}. Está certo?")
+```
+
+Exemplos completos:
+
+| Exemplo | O que mostra |
+|---|---|
+| [`atendente_twilio.py`](../examples/atendente_twilio.py) | Atendente geral: frases prontas, sua IA, confirmação, desistência, despedida |
+| [`agendamento.py`](../examples/agendamento.py) | Marcar, remarcar e cancelar consultas: `decide` com intenções do negócio, horários como opções faladas, nome e telefone ditados, confirmação antes de gravar |
+| [`ura.py`](../examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para o setor certo, com CPF pedido no financeiro |
+
+## 6. Ligação de verdade pelo Twilio
+
+1. Crie uma conta no [Twilio](https://www.twilio.com) e compre um número de telefone com voz.
+2. Rode um dos exemplos no seu computador:
+
+```bash
+pip install ermis-voice fastapi uvicorn python-multipart
+uvicorn agendamento:app --port 8000
+```
+
+3. Deixe a porta 8000 acessível pela internet com HTTPS, por exemplo com [ngrok](https://ngrok.com): `ngrok http 8000`. Anote o endereço `https://….ngrok-free.app`.
+4. No console do Twilio, abra o número e, em **Voice Configuration → A call comes in**, escolha **Webhook**, método `POST`, com a URL `https://….ngrok-free.app/twilio/voz`.
+5. Ligue para o número.
+
+O que acontece: o Twilio chama `/twilio/voz`; o exemplo cria a sessão com `transport="twilio"`, responde com `session.twiml()` e abre o canal de controle. O Twilio manda o áudio direto para a Ermis; o seu servidor só conduz a conversa.
+
+## 7. Ligação pelo navegador
+
+Para um botão "Ligar" no seu site, o seu backend cria a sessão e entrega ao navegador **só** o `audio_url` e o `session_token`:
+
+```python
+@app.post("/ligar")
+async def ligar():
+    session = await ermis.sessions.create(transport="browser", audio_format="pcm16_48k")
+    asyncio.create_task(conversar(session))   # a mesma conduzir() dos exemplos
+    return session.browser_credentials()       # {"audio_url": ..., "session_token": ...}
+```
+
+O navegador abre `audio_url?session_token=…`, envia o microfone em quadros de μ-law 8 kHz de 20 ms (160 bytes), toca o áudio recebido (PCM16 48 kHz) e descarta a fila ao receber `{"type": "clear"}`. Ao receber `{"type": "audio.end", "id"}`, responda `{"type": "playback_finished", "id"}` quando a fala terminar de tocar. Peça o microfone com `echoCancellation: true`. Detalhes em [Conectando o áudio](api.md#conectando-o-áudio).
+
+## 8. Antes de ir para produção
+
+- [ ] A chave está só no servidor, em variável de ambiente ou cofre de segredos.
+- [ ] Toda ligação termina: despedida seguida de `end()`, e um limite de tentativas quando o cliente não é entendido.
+- [ ] `is_escape` com `intent == "request_human"` leva a uma pessoa de verdade (transferência no Twilio, como em `ura.py`).
+- [ ] Mensagens de espera configuradas (`WaitingOptions`) se a sua IA leva mais de um segundo.
+- [ ] Dados importantes (e-mail, CPF, data) são confirmados antes de gravar.
+- [ ] `vad.min_silence_ms` ajustado ao seu público: 600 a 800 ms para quem dita números ou fala devagar.
+- [ ] Erros tratados: `InsufficientCreditsError`, `ChannelLimitError`, `RateLimitError` e `ConnectionClosedError`. Guarde o `request_id` dos erros para o suporte.
+- [ ] Testado com ligações reais do seu público, em celular e em ambiente com ruído.
+
+Dúvidas sobre qualidade e latência: [perguntas frequentes](api.md#perguntas-frequentes-qualidade-e-latência).

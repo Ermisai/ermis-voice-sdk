@@ -6,6 +6,47 @@
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
+**Novo por aqui?** O guia [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md) leva você da instalação a um número de telefone atendido pelo agente. No terceiro passo você já ouve o agente, sem telefone e sem navegador.
+
+## Como funciona
+
+```mermaid
+flowchart LR
+    cliente(["Cliente final"]) <-->|voz| origem["Twilio ou navegador"]
+    origem <-->|"áudio (audio_url)"| api
+    subgraph api ["Ermis Voice API · servidores da Ermis"]
+        direction TB
+        ouve["Detecta fala e interrupção"] --> transcreve["Transcreve e avalia"]
+        transcreve --> decide["Decide a intenção"]
+        fala["Fala com voz natural"]
+        espera["Frases de espera"]
+    end
+    api <-->|"eventos e comandos (control_url)"| sdk
+    subgraph backend ["Seu servidor · guarda a chave"]
+        sdk["SDK ermis"] <-->|objetos Python| codigo["Seu código e sua IA"]
+    end
+```
+
+São dois caminhos. O **áudio** vai do telefone (ou do navegador) direto para a Ermis e volta, sem passar pelo seu servidor. Os **eventos e comandos** ("o cliente disse X e quer Y", "fale Z") são os únicos que passam pelo SDK. Uma ligação é sempre o mesmo laço:
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente final
+    participant E as Ermis Voice API
+    participant S as Seu servidor (SDK)
+    S->>E: sessions.create()
+    C->>E: o áudio conecta
+    E-->>S: SessionStarted
+    S->>E: speak("Olá! Como posso ajudar?")
+    C->>E: "quero marcar uma consulta"
+    E-->>S: Transcript + Decision
+    Note over S: seu roteiro ou sua IA escolhe a resposta
+    S->>E: speak("Claro! Para qual dia?")
+    E->>C: voz do agente (para se o cliente interromper)
+    S->>E: end() depois da despedida
+    E-->>S: SessionEnded
+```
+
 ## O que é de quem
 
 | | A **Voice API** (nos servidores da Ermis) | O **SDK** (no seu servidor) | **Você** |
@@ -69,6 +110,17 @@ async def conversar(session):
 ```
 
 Exemplo completo, com respostas rápidas, confirmação, desistência e despedida: [`examples/atendente_twilio.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py).
+
+## Exemplos
+
+| Exemplo | O que mostra |
+|---|---|
+| [`primeira_ligacao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/primeira_ligacao.py) | Fale com o agente sem telefone: envia um WAV gravado e salva a resposta em `resposta.wav` |
+| [`atendente_twilio.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py) | Atendente geral por telefone: frases prontas, sua IA, confirmação, desistência e despedida |
+| [`agendamento.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py) | Marcar, remarcar e cancelar consultas: intenções do negócio, horários como opções faladas, nome e telefone ditados, confirmação |
+| [`ura.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para financeiro, suporte ou vendas |
+
+Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio; o passo a passo está em [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md#6-ligação-de-verdade-pelo-twilio).
 
 ## Referência
 
@@ -182,6 +234,7 @@ O mesmo erro chega como status HTTP ou código de fechamento do WebSocket; o SDK
 
 ## Documentação
 
+- [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a uma ligação de verdade, com lista de conferência para produção.
 - [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): sessões, canal de controle, decisões, mensagens de espera, áudio e erros.
 - Na plataforma da Ermis: **Documentação API → Ermis Voice** e a aba **Ligação** da Área de Teste, para conversar com o agente pelo microfone.
 

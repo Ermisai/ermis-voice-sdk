@@ -1,11 +1,11 @@
 """Atendente por telefone com Twilio, usando o SDK da Ermis.
 
-É o mesmo atendente de ``examples/cliente/atendente_twilio.py`` (que fala o
-protocolo cru), escrito com o SDK: sem JSON à mão, com eventos tipados.
+Passo a passo completo em docs/primeiros-passos.md (seção "Ligação de verdade pelo Twilio").
 
 Rodar:
-    pip install ermis fastapi uvicorn
-    export ERMIS_API_KEY=ek_test_...
+    pip install ermis-voice fastapi uvicorn python-multipart
+    export ERMIS_API_KEY=...            # chave do Ermis Voice
+    export ERMIS_API_URL=...            # URL do Ermis Voice
     uvicorn atendente_twilio:app --port 8000
 
 No Twilio, configure o webhook de voz do número para ``https://<seu-host>/twilio/voz``.
