@@ -112,8 +112,8 @@ Base: `https://api.ermis.ai`
 | `POST /v1/voice/sessions` | Cria uma sessão |
 | `GET /v1/voice/sessions/{session_id}` | Estado da sessão e segundos cobrados até agora |
 | `DELETE /v1/voice/sessions/{session_id}` | Encerra a sessão |
-| `GET /v1/usage?from=2026-10-01&to=2026-10-31&group_by=day` | Minutos e créditos no período (`group_by`: `day` ou `session`) |
-| `GET /v1/account/balance` | Saldo de créditos e quando cada parte expira |
+| `GET /v1/usage?limit=50&before=123` | Lançamentos de crédito em `entries`; use `next_cursor` como o próximo `before` |
+| `GET /v1/account/balance` | `balance`, `reserved_credits` e `available_credits` |
 
 ### Criar sessão
 

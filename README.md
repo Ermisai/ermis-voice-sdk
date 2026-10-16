@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Prévia (0.1.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
+> **Prévia (0.2.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
@@ -81,9 +81,11 @@ Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ER
 | `await ermis.sessions.create(**opções)` | `POST /v1/voice/sessions` | `Session` |
 | `await ermis.sessions.get(session_id)` | `GET /v1/voice/sessions/{id}` | `dict` |
 | `await ermis.sessions.end(session_id)` | `DELETE /v1/voice/sessions/{id}` | `None` |
-| `await ermis.usage(from_=, to=, group_by="day")` | `GET /v1/usage` | `dict` |
+| `await ermis.usage(limit=50, before=None)` | `GET /v1/usage` | `dict` com `entries` e `next_cursor` |
 | `await ermis.balance()` | `GET /v1/account/balance` | `dict` |
 | `ermis.connect(session_or_control_url)` | WebSocket `control_url` | `Call` (use com `async with`) |
+
+`usage()` devolve os lançamentos de crédito em páginas: passe o `next_cursor` recebido em `before` para buscar a página seguinte (`limit` de 1 a 100). `balance()` devolve `balance`, `reserved_credits` (reservado por ligações em andamento) e `available_credits`, em créditos inteiros.
 
 **Opções de `sessions.create`** (todas opcionais; o que você não passar usa o padrão da API):
 `transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice`, `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`.
@@ -158,13 +160,14 @@ Todo evento tem `type` e `raw` (o JSON original). Eventos novos da API chegam co
 
 ### Erros
 
-O mesmo erro chega como status HTTP ou código de fechamento do WebSocket; o SDK levanta a mesma exceção nos dois casos. Todas herdam de `ErmisError` (`message`, `code`, `status`).
+O mesmo erro chega como status HTTP ou código de fechamento do WebSocket; o SDK levanta a mesma exceção nos dois casos. Todas herdam de `ErmisError` (`message`, `code`, `status`, `request_id`). Guarde o `request_id` para falar com o suporte.
 
 | Exceção | HTTP / WebSocket |
 |---|---|
 | `AuthenticationError` | 401 / 4001 |
 | `InsufficientCreditsError` | 402 / 4002 |
 | `ChannelLimitError` | 429 / 4029 |
+| `RateLimitError` | 429 com código `rate_limited` (muitas requisições em pouco tempo; tente de novo em instantes) |
 | `InvalidRequestError` | 400 / 4400 (também quando `decide`/`extract_slot` recebem `error`) |
 | `SessionTimeoutError` | 4008 (60 s sem áudio) |
 | `MaxDurationError` | 4013 |

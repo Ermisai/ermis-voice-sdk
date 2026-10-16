@@ -23,6 +23,7 @@ from ermis import (
     Ermis,
     InsufficientCreditsError,
     InvalidRequestError,
+    RateLimitError,
     SessionEnded,
     SessionStarted,
     Transcript,
@@ -97,13 +98,50 @@ async def test_http_errors_map_to_exceptions(status, exc):
 async def test_usage_and_balance():
     def api(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v1/usage":
-            assert dict(request.url.params) == {"from": "2026-10-01", "to": "2026-10-31", "group_by": "session"}
-            return httpx.Response(200, json={"items": []})
-        return httpx.Response(200, json={"balance": 1000})
+            assert dict(request.url.params) == {"limit": "25", "before": "123"}
+            return httpx.Response(200, json={"account_id": 42, "unit": "credit", "entries": [], "next_cursor": None})
+        return httpx.Response(
+            200,
+            json={
+                "account_id": 42,
+                "unit": "credit",
+                "balance": 1000,
+                "reserved_credits": 100,
+                "available_credits": 900,
+            },
+        )
 
     ermis = _client(api)
-    assert await ermis.usage(from_="2026-10-01", to="2026-10-31", group_by="session") == {"items": []}
-    assert await ermis.balance() == {"balance": 1000}
+    assert (await ermis.usage(limit=25, before=123))["entries"] == []
+    assert (await ermis.balance())["available_credits"] == 900
+
+
+async def test_usage_default_pagination():
+    def api(request):
+        assert dict(request.url.params) == {"limit": "50"}
+        return httpx.Response(200, json={"entries": [], "next_cursor": None})
+
+    assert (await _client(api).usage())["next_cursor"] is None
+
+
+@pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 101}, {"limit": True}, {"before": 0}, {"before": "1"}])
+async def test_usage_rejects_invalid_pagination(params):
+    def api(request):
+        raise AssertionError("invalid pagination must not make a request")
+
+    with pytest.raises(InvalidRequestError):
+        await _client(api).usage(**params)
+
+
+async def test_rate_limit_and_gateway_trace_are_exposed():
+    ermis = _client(
+        lambda req: httpx.Response(
+            429, headers={"X-Request-Id": "trace-123"}, json={"error": "rate_limited", "message": "Tente novamente"}
+        )
+    )
+    with pytest.raises(RateLimitError) as failure:
+        await ermis.sessions.create()
+    assert failure.value.code == "rate_limited" and failure.value.request_id == "trace-123"
 
 
 def test_missing_api_key(monkeypatch):
@@ -116,6 +154,10 @@ def test_missing_api_key(monkeypatch):
 
 
 def test_parse_events():
+    usage = parse_event({"type": "usage", "billed_seconds": 10, "credits": 1.25, "balance": 9.75})
+    assert usage.credits == 1.25 and usage.balance == 9.75
+    pending = parse_event({"type": "usage", "billed_seconds": 10, "credits": None})
+    assert pending.credits is None
     t = parse_event(
         {"type": "transcript", "utterance_id": "u1", "text": "oi", "assessment": {"confirm": True}, "latency_ms": 90}
     )

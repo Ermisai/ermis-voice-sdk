@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Any
 from xml.sax.saxutils import quoteattr
 
@@ -13,7 +12,7 @@ from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import InvalidStatus
 
 from .call import Call
-from .errors import AuthenticationError, from_http
+from .errors import AuthenticationError, InvalidRequestError, from_http
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
 DEFAULT_BASE_URL = "https://api.ermis.ai"
@@ -137,20 +136,29 @@ class Ermis:
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         resp = await self._http.request(method, path, headers=self._auth(), **kwargs)
         if resp.is_error:
+            code = None
             try:
-                message = resp.json().get("message", "")
+                error = resp.json()
+                message = error.get("message", "") if isinstance(error, dict) else ""
+                code = error.get("error") if isinstance(error, dict) else None
             except ValueError:
                 message = resp.text
-            raise from_http(resp.status_code, message)
+            raise from_http(resp.status_code, message, code=code, request_id=resp.headers.get("x-request-id"))
         return resp.json() if resp.content else None
 
-    async def usage(self, *, from_: date | str, to: date | str, group_by: str = "day") -> dict[str, Any]:
-        """Minutos e créditos no período. ``group_by``: ``day`` ou ``session``."""
-        params = {"from": str(from_), "to": str(to), "group_by": group_by}
+    async def usage(self, *, limit: int = 50, before: int | None = None) -> dict[str, Any]:
+        """Lançamentos financeiros: ``entries`` e ``next_cursor`` para a próxima página."""
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise InvalidRequestError("limit deve ser um inteiro entre 1 e 100")
+        if before is not None and (type(before) is not int or before < 1):
+            raise InvalidRequestError("before deve ser um cursor inteiro positivo")
+        params = {"limit": str(limit)}
+        if before is not None:
+            params["before"] = str(before)
         return await self._request("GET", "/v1/usage", params=params)
 
     async def balance(self) -> dict[str, Any]:
-        """Saldo de créditos e quando cada parte expira."""
+        """Carteira oficial: balance, reserved_credits e available_credits."""
         return await self._request("GET", "/v1/account/balance")
 
     def connect(self, session: Session | str) -> _CallConnector:

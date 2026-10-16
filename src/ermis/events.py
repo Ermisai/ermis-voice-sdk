@@ -144,8 +144,8 @@ class Usage(Event):
     """Uso acumulado, a cada 60 s."""
 
     billed_seconds: int
-    credits: int
-    balance: int | None
+    credits: float | None
+    balance: float | None
 
 
 @dataclass(frozen=True)
@@ -170,7 +170,7 @@ class SessionEnded(Event):
 
     reason: str | None
     billed_seconds: int | None
-    credits: int | None
+    credits: float | None
 
 
 @dataclass(frozen=True)
@@ -238,9 +238,7 @@ def parse_event(msg: dict[str, Any]) -> Event:
     if t == "reply_timeout":
         return ReplyTimeout(t, msg, utterance_id=g("utterance_id"), action=g("action", ""))
     if t == "usage":
-        return Usage(
-            t, msg, billed_seconds=int(g("billed_seconds") or 0), credits=int(g("credits") or 0), balance=g("balance")
-        )
+        return Usage(t, msg, billed_seconds=int(g("billed_seconds") or 0), credits=g("credits"), balance=g("balance"))
     if t == "warning":
         return WarningEvent(t, msg, code=g("code", ""), message=g("message"))
     if t == "error":

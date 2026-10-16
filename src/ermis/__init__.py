@@ -16,6 +16,7 @@ from .errors import (
     InsufficientCreditsError,
     InvalidRequestError,
     MaxDurationError,
+    RateLimitError,
     SessionTimeoutError,
 )
 from .events import (
@@ -42,7 +43,7 @@ from .events import (
 )
 from .options import BargeInOptions, VadOptions, WaitingOptions
 
-__version__ = "0.1.0a1"
+__version__ = "0.2.0a1"
 
 __all__ = [
     "APIError",
@@ -63,6 +64,7 @@ __all__ = [
     "InsufficientCreditsError",
     "InvalidRequestError",
     "MaxDurationError",
+    "RateLimitError",
     "ReplyTimeout",
     "Session",
     "SessionEnded",
