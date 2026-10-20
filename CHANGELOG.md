@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- `Decision.custom_intent_confidence`: quanto a escolha de `custom_intent` é segura (abaixo de 0,8, trate como `other`); veja "Fala confusa ou fora do assunto" na documentação. `Decision.complexity` agora é decimal, como na API.
 - `call.expect_slot(nome, tipo)`: avisa que a próxima resposta traz um dado (endereço, e-mail, CPF); a Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, e o valor chega no `Future` devolvido. Novo evento `TranscriptRevised` com a frase corrigida.
 - Voz natural automática: toda fala passa por `normalize_for_speech()` antes de ir para a voz (números e valores por extenso, com gênero, datas, horas, porcentagens, CPF, CEP e telefone em grupos, e-mails e sites lidos, sem markdown nem emojis). Desligue com `ermis.connect(session, normalize_text=False)` ou `speak(..., normalize=False)`. `normalize_for_speech()` e `number_to_words()` também podem ser usados direto.
 - `sessions.create(vocabulary=[...])` e `call.set_vocabulary()`: palavras do seu negócio; a transcrição chega corrigida na direção delas ("marquerita" -> "margherita"). `Transcript.corrections` lista os ajustes.

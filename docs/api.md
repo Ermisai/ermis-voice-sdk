@@ -225,7 +225,12 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `is_escape` | `true` quando o cliente quer desligar ou falar com uma pessoa |
 | `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
+| `custom_intent_confidence` | De 0 a 1: quanto a escolha de `custom_intent` é segura. Frases truncadas ou fora do assunto que ainda caem numa intenção sua vêm baixas (abaixo de 0,8): trate como `other` |
 | `extracted.name` | Nome do cliente, quando ele se apresenta ou corrige o nome |
+
+
+
+No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
 
 
@@ -242,6 +247,24 @@ O reconhecimento de fala conhece o português do dia a dia, mas não o seu card�
 O `transcript` traz em `corrections` o que foi ajustado (`heard`, `term`, `score`). Palavras comuns, números e nomes de pessoas não são trocados. Use termos que o cliente fala, não códigos internos.
 
 No SDK: `sessions.create(vocabulary=[...])` e `call.set_vocabulary([...])`; `Transcript.corrections` traz o que foi ajustado.
+
+### Fala confusa ou fora do assunto
+
+- **Fala confusa** (transcrição ruim, frase sem sentido): a `decision` vem com `action` igual a `clarify`. Peça para repetir quando, além disso, a fala não trouxer nenhuma intenção sua com segurança (`custom_intent` `other` ou `custom_intent_confidence` abaixo de 0,8). Respostas curtas e válidas ("grande", "não, só isso") também podem vir com `clarify`, por isso olhe as duas coisas.
+- **Fora do assunto** ("vocês vendem celular?", "vai chover amanhã?"): `custom_intent` vem `other` com confiança alta e `action` diferente de `clarify`. Diga educadamente o que o agente faz e volte à pergunta em que estava.
+
+### Dados importantes: endereço, e-mail, documentos
+
+Endereços, e-mails e números ditados são onde a transcrição rápida mais erra ("rodas flores" no lugar de "Rua das Flores"). Quando fizer a pergunta, avise que a próxima resposta traz o dado:
+
+```json
+{"type": "speak", "id": "r7", "text": "Pra qual endereço eu mando?"}
+{"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address", "description": "rua, número e bairro"}}
+```
+
+Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta.
+
+No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
 ### Intenções customizadas
 
