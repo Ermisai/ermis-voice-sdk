@@ -19,7 +19,7 @@ from .events import Audio, BargeIn, Decision, ErrorEvent, Event, SessionEnded, S
 
 @dataclass(frozen=True)
 class CustomIntent:
-    """Uma intenção do seu negócio para ``Call.decide()``."""
+    """Uma intenção do seu negócio: em ``sessions.create(custom_intents=...)`` ou ``Call.decide()``."""
 
     key: str
     label: str
@@ -230,6 +230,15 @@ class Call:
         if timeout_ms is not None:
             msg["timeout_ms"] = timeout_ms
         await self.send(msg)
+
+    async def set_custom_intents(self, custom_intents: list[CustomIntent | dict[str, Any]]) -> None:
+        """Troca as intenções avaliadas nas próximas decisões automáticas (``[]`` desliga)."""
+        await self.send(
+            {
+                "type": "set_custom_intents",
+                "custom_intents": [asdict(i) if isinstance(i, CustomIntent) else i for i in custom_intents],
+            }
+        )
 
     async def done_processing(self) -> None:
         """Você decidiu não responder esta fala. O agente volta a ouvir."""

@@ -125,11 +125,17 @@ Base: `https://api.ermis.ai`
 | `language` | string | `pt-BR` | Idioma da conversa |
 | `voice` | string | a voz padrão da conta | Voz do agente: um `id` de `GET /v1/voice/voices`. Uma voz desconhecida devolve `400` |
 | `auto_decide` | bool | `true` | Cada fala do cliente já vem com o evento `decision` |
-| `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa) ou `accuracy` (confere falas duvidosas). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
+| `partial_transcripts` | bool | `false` | Envia `transcript.partial` com o texto parcial enquanto o cliente ainda fala |
+| `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa), `accuracy` (confere falas duvidosas), `local_first` (a leitura de maior qualidade só nas falas em que o reconhecimento rápido ficou em dúvida) ou `local_only` (só o reconhecimento rápido). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
+| `turn_detection` | string | `smart_turn` | `smart_turn`: um modelo ouve como a fala termina e fecha o turno antes do silêncio completo quando a pessoa terminou; `silence`: só o silêncio de `vad.min_silence_ms` |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
+| `early_turn.speculate` | bool | `false` | Começa a transcrever (e a decidir) já na pausa do cliente, antes de o turno fechar. Se o cliente voltar a falar, esse trabalho é descartado |
+| `early_turn.pause_ms` | int | `160` | Pausa que inicia esse trabalho adiantado (60 a 1000) |
+| `early_turn.close_on_complete_text` | bool | `false` | Fecha o turno assim que o texto já é um pedido completo, sem esperar todo o silêncio. Frases que terminam abertas ("o meu e-mail é", números sendo ditados) continuam esperando |
 | `barge_in.enabled` | bool | `true` | Permite que o cliente interrompa o agente |
 | `barge_in.min_speech_ms` | int | `150` | Fala contínua necessária para interromper |
 | `max_duration_s` | int | `1800` | Duração máxima da sessão |
+| `custom_intents` | lista | `[]` | Intenções do seu negócio (`key`, `label`, `description`; até 20). Cada decisão automática já traz `custom_intent` com a escolhida, sem pedido extra ([ver abaixo](#intenções-customizadas)) |
 | `waiting` | objeto | [ver abaixo](#enquanto-a-sua-ia-pensa) | Mensagens de espera e tempo limite enquanto a sua IA prepara a resposta |
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
 
@@ -163,6 +169,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `{"type": "interrupt"}` | Para a fala atual do agente |
 | `{"type": "decide", "id": "d1", "text": "…", "custom_intents": […]}` | Pede uma decisão, com intenções suas ([ver abaixo](#intenções-customizadas)) |
 | `{"type": "extract_slot", "id": "s1", "text": "…", "slot": {"name": "email", "type": "email"}}` | Extrai um dado da fala |
+| `{"type": "set_custom_intents", "custom_intents": […]}` | Troca as intenções suas avaliadas nas próximas decisões automáticas (por exemplo, a cada etapa da conversa); `[]` desliga |
 | `{"type": "thinking", "message": "…", "timeout_ms": 45000}` | A resposta vai demorar: o agente fala `message` agora e espera até `timeout_ms` neste turno ([ver abaixo](#avisar-que-vai-demorar-thinking)) |
 | `{"type": "done_processing"}` | Você decidiu não responder esta fala (por exemplo, era ruído). O agente volta a ouvir |
 | `{"type": "end"}` | Encerra a sessão |
@@ -218,7 +225,16 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 
 ### Intenções customizadas
 
-Envie as intenções do seu negócio e receba qual se aplica:
+Defina as intenções do seu negócio ao criar a sessão (`custom_intents`) e cada `decision` automática já traz em `custom_intent` a que se aplica, ou `other`. É a forma mais rápida: a escolha sai na mesma decisão, que começa ainda na pausa do cliente.
+
+```json
+{"transport": "twilio", "custom_intents": [
+  {"key": "pedir_pizza", "label": "Pede pizza", "description": "tamanho, sabor ou quantidade"},
+  {"key": "perguntar_cardapio", "label": "Pergunta sobre o cardápio", "description": "sabores, tamanhos, opções sem carne"}
+]}
+```
+
+Para trocar as intenções no meio da ligação, envie `set_custom_intents`. Também é possível pedir uma decisão avulsa sobre qualquer texto:
 
 ```json
 {"type": "decide", "id": "d1", "text": "quero a segunda via do boleto",

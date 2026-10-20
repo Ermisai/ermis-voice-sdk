@@ -95,13 +95,20 @@ class _Sessions:
         voice: str = UNSET,
         auto_decide: bool = UNSET,
         transcription_priority: str = UNSET,
+        turn_detection: str = UNSET,
+        early_turn: dict[str, Any] = UNSET,
+        custom_intents: list[Any] = UNSET,
         vad: VadOptions | dict[str, Any] = UNSET,
         barge_in: BargeInOptions | dict[str, Any] = UNSET,
         waiting: WaitingOptions | dict[str, Any] = UNSET,
         max_duration_s: int = UNSET,
         metadata: dict[str, Any] = UNSET,
     ) -> Session:
-        """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API."""
+        """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
+
+        ``custom_intents`` (lista de ``CustomIntent``): as intenções do seu negócio. Cada ``Decision``
+        automática já traz em ``custom_intent`` a que se aplica, sem chamar ``call.decide()``.
+        """
         body = session_body(
             transport=transport,
             audio_format=audio_format,
@@ -109,6 +116,9 @@ class _Sessions:
             voice=voice,
             auto_decide=auto_decide,
             transcription_priority=transcription_priority,
+            turn_detection=turn_detection,
+            early_turn=early_turn,
+            custom_intents=custom_intents,
             vad=vad,
             barge_in=barge_in,
             waiting=waiting,

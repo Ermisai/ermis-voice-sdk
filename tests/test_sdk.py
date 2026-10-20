@@ -76,6 +76,31 @@ async def test_create_session_sends_only_given_fields():
     assert ermis.sandbox
 
 
+async def test_session_turn_options_and_custom_intents():
+    seen: list[dict] = []
+
+    def api(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(201, json=SESSION)
+
+    ermis = _client(api)
+    await ermis.sessions.create(
+        transcription_priority="local_first",
+        turn_detection="smart_turn",
+        early_turn={"speculate": True, "close_on_complete_text": True},
+        custom_intents=[CustomIntent("pedir_pizza", "Pede pizza", "tamanho e sabor"), {"key": "outro_assunto"}],
+    )
+    assert seen[0] == {
+        "transcription_priority": "local_first",
+        "turn_detection": "smart_turn",
+        "early_turn": {"speculate": True, "close_on_complete_text": True},
+        "custom_intents": [
+            {"key": "pedir_pizza", "label": "Pede pizza", "description": "tamanho e sabor"},
+            {"key": "outro_assunto"},
+        ],
+    }
+
+
 async def test_twiml_is_valid_xml_with_escaped_token():
     ermis = _client(lambda r: httpx.Response(201, json=SESSION))
     session = await ermis.sessions.create(transport="twilio")
@@ -331,3 +356,29 @@ def test_waiting_options_new_fields():
 
     opts = WaitingOptions(filler_by_intent={"complaint": ["Sinto muito."]}, gap_after_ms=None)
     assert opts.to_dict() == {"filler_by_intent": {"complaint": ["Sinto muito."]}, "gap_after_ms": None}
+
+
+async def test_set_custom_intents_command():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        received.append(json.loads(await ws.recv()))
+        received.append(json.loads(await ws.recv()))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    await call.set_custom_intents([CustomIntent("financeiro", "Financeiro")])
+                    await call.set_custom_intents([])
+
+    await _with_server(handler, body)
+    assert received == [
+        {
+            "type": "set_custom_intents",
+            "custom_intents": [{"key": "financeiro", "label": "Financeiro", "description": ""}],
+        },
+        {"type": "set_custom_intents", "custom_intents": []},
+    ]

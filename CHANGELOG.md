@@ -2,6 +2,8 @@
 
 ## Não lançado
 
+- `sessions.create(custom_intents=[CustomIntent(...)])`: as intenções do seu negócio vêm em cada `Decision` automática (`custom_intent`), sem chamar `call.decide()`; `call.set_custom_intents()` troca as intenções no meio da ligação.
+- Opções `turn_detection` (`smart_turn` ou `silence`) e `early_turn`, e `transcription_priority` aceita `local_first` e `local_only`.
 - `ermis.voices.list()`: vozes disponíveis para a conta (`Voice`: `id`, `name`, `gender`, `language`, `production`, `default`); use o `id` em `sessions.create(voice=...)`.
 - Guia [Primeiros passos](docs/primeiros-passos.md), da instalação a um número de telefone atendido pelo agente.
 - Exemplos novos: `primeira_ligacao.py` (sem telefone, com um WAV gravado), `agendamento.py` (consultas) e `ura.py` (URA por voz com transferência).
