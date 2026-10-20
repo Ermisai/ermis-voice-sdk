@@ -110,6 +110,7 @@ Base: `https://api.ermis.ai`
 | Método e caminho | O que faz |
 |---|---|
 | `POST /v1/voice/sessions` | Cria uma sessão |
+| `GET /v1/voice/voices` | Vozes disponíveis para o campo `voice` ([ver abaixo](#vozes)) |
 | `GET /v1/voice/sessions/{session_id}` | Estado da sessão e segundos cobrados até agora |
 | `DELETE /v1/voice/sessions/{session_id}` | Encerra a sessão |
 | `GET /v1/usage?limit=50&before=123` | Lançamentos de crédito em `entries`; use `next_cursor` como o próximo `before` |
@@ -122,7 +123,7 @@ Base: `https://api.ermis.ai`
 | `transport` | string | `websocket` | Como o áudio chega: `twilio`, `browser` ou `websocket` ([detalhes](#conectando-o-áudio)) |
 | `audio_format` | string | `mulaw_8k` | Formato do áudio que a Ermis devolve: `mulaw_8k` (telefonia) ou `pcm16_48k` (navegador) |
 | `language` | string | `pt-BR` | Idioma da conversa |
-| `voice` | string | `woman` | Voz do agente |
+| `voice` | string | a voz padrão da conta | Voz do agente: um `id` de `GET /v1/voice/voices`. Uma voz desconhecida devolve `400` |
 | `auto_decide` | bool | `true` | Cada fala do cliente já vem com o evento `decision` |
 | `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa) ou `accuracy` (confere falas duvidosas). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
@@ -133,6 +134,22 @@ Base: `https://api.ermis.ai`
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
 
 Resposta `201`: `session_id`, `audio_url`, `control_url`, `session_token`.
+
+### Vozes
+
+`GET /v1/voice/voices` lista as vozes que a sua conta pode usar. Use o `id` no campo `voice` ao criar a sessão. No SDK: `await ermis.voices.list()`.
+
+```json
+{
+  "voices": [
+    {"id": "man", "name": "Masculina", "gender": "male", "language": "pt-BR", "description": null, "production": true, "default": true},
+    {"id": "demo", "name": "Demo", "gender": "male", "language": "pt-BR", "description": null, "production": false, "default": false}
+  ],
+  "default": "man"
+}
+```
+
+Vozes com `production: false` servem só para testes e não devem ser usadas com clientes reais. Sem `voice`, a sessão usa a voz `default`.
 
 ## Canal de controle (WebSocket)
 

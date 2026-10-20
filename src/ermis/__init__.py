@@ -6,7 +6,7 @@ da ligação como objetos Python, com métodos para mandar o agente agir.
 """
 
 from .call import Call, CustomIntent
-from .client import Ermis, Session
+from .client import Ermis, Session, Voice
 from .errors import (
     APIError,
     AuthenticationError,
@@ -77,6 +77,7 @@ __all__ = [
     "SpeechStarted",
     "Transcript",
     "UnknownEvent",
+    "Voice",
     "Usage",
     "VadOptions",
     "WaitingOptions",

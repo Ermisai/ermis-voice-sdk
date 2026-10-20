@@ -28,6 +28,7 @@ from ermis import (
     SessionStarted,
     Transcript,
     UnknownEvent,
+    Voice,
     WaitingOptions,
     parse_event,
 )
@@ -114,6 +115,32 @@ async def test_usage_and_balance():
     ermis = _client(api)
     assert (await ermis.usage(limit=25, before=123))["entries"] == []
     assert (await ermis.balance())["available_credits"] == 900
+
+
+async def test_list_voices_and_use_one():
+    sent = []
+
+    def api(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/voice/voices":
+            return httpx.Response(
+                200,
+                json={
+                    "voices": [
+                        {"id": "man", "name": "Masculina", "gender": "male", "production": True, "default": True},
+                        {"id": "demo", "name": "Demo", "production": False},
+                    ],
+                    "default": "man",
+                },
+            )
+        sent.append(json.loads(request.content))
+        return httpx.Response(201, json=SESSION)
+
+    ermis = _client(api)
+    voices = await ermis.voices.list()
+    assert voices[0] == Voice(id="man", name="Masculina", gender="male", default=True)
+    assert [v.id for v in voices if v.production] == ["man"]
+    await ermis.sessions.create(voice=voices[1].id)
+    assert sent == [{"voice": "demo"}]
 
 
 async def test_usage_default_pagination():

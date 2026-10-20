@@ -45,6 +45,43 @@ class Session:
         return {"audio_url": self.audio_url, "session_token": self.session_token}
 
 
+@dataclass(frozen=True)
+class Voice:
+    """Uma voz do agente. Use o ``id`` em ``sessions.create(voice=...)``."""
+
+    id: str
+    name: str
+    gender: str | None = None
+    language: str = "pt-BR"
+    description: str | None = None
+    production: bool = True
+    """``False`` para vozes só de teste, que não devem ser usadas com clientes reais."""
+    default: bool = False
+    """A voz usada quando ``voice`` não é informado."""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Voice:
+        return cls(
+            id=data["id"],
+            name=data.get("name") or data["id"],
+            gender=data.get("gender"),
+            language=data.get("language") or "pt-BR",
+            description=data.get("description"),
+            production=data.get("production", True),
+            default=data.get("default", False),
+        )
+
+
+class _Voices:
+    def __init__(self, client: Ermis) -> None:
+        self._client = client
+
+    async def list(self) -> list[Voice]:
+        """Vozes disponíveis para a sua conta (``GET /v1/voice/voices``), a padrão primeiro."""
+        data = await self._client._request("GET", "/v1/voice/voices")
+        return [Voice.from_dict(item) for item in data.get("voices", [])]
+
+
 class _Sessions:
     def __init__(self, client: Ermis) -> None:
         self._client = client
@@ -104,7 +141,8 @@ class Ermis:
     ::
 
         ermis = Ermis()  # lê ERMIS_API_KEY
-        session = await ermis.sessions.create(transport="twilio")
+        voices = await ermis.voices.list()
+        session = await ermis.sessions.create(transport="twilio", voice=voices[0].id)
         async with ermis.connect(session) as call:
             async for event in call:
                 ...
@@ -124,6 +162,7 @@ class Ermis:
         self.base_url = (base_url or os.environ.get("ERMIS_API_URL") or DEFAULT_BASE_URL).rstrip("/")
         self._http = http_client or httpx.AsyncClient(base_url=self.base_url, timeout=timeout)
         self.sessions = _Sessions(self)
+        self.voices = _Voices(self)
 
     @property
     def sandbox(self) -> bool:
