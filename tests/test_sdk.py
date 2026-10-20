@@ -27,6 +27,7 @@ from ermis import (
     SessionEnded,
     SessionStarted,
     Transcript,
+    TranscriptRevised,
     UnknownEvent,
     Voice,
     WaitingOptions,
@@ -426,3 +427,49 @@ async def test_speech_is_normalized_unless_turned_off():
     assert received[3]["text"] == "2 pizzas"
     transcript = next(e for e in seen if isinstance(e, Transcript))
     assert transcript.corrections == [{"heard": "marquerita", "term": "margherita", "score": 0.89}]
+
+
+async def test_expect_slot_value_arrives_after_the_decision():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        expect = json.loads(await ws.recv())
+        received.append(expect)
+        await ws.send(
+            json.dumps({"type": "transcript", "utterance_id": "u1", "text": "rodas flores dez", "assessment": {}})
+        )
+        await ws.send(json.dumps({"type": "decision", "utterance_id": "u1", "intent": "complex", "action": "escalate"}))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "transcript.revised",
+                    "utterance_id": "u1",
+                    "text": "Rua das Flores, 10",
+                    "previous": "rodas flores dez",
+                }
+            )
+        )
+        await ws.send(
+            json.dumps({"type": "slot", "id": expect["id"], "value": "Rua das Flores, 10", "status": "found"})
+        )
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        seen, values = [], []
+        async with ermis.connect(url) as call:
+            expected = None
+            async for event in call:
+                seen.append(event)
+                if isinstance(event, SessionStarted):
+                    expected = await call.expect_slot("endereco", "address", description="rua e número")
+                elif isinstance(event, Decision):
+                    values.append(await expected)
+        return seen, values
+
+    seen, values = await _with_server(handler, body)
+    assert received[0]["type"] == "expect_slot"
+    assert received[0]["slot"] == {"name": "endereco", "type": "address", "description": "rua e número"}
+    assert values[0].found and values[0].value == "Rua das Flores, 10"
+    revised = next(e for e in seen if isinstance(e, TranscriptRevised))
+    assert revised.text == "Rua das Flores, 10" and revised.previous == "rodas flores dez"

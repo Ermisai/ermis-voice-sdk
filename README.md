@@ -162,6 +162,20 @@ waiting = WaitingOptions(
 )
 ```
 
+### Dados importantes (endereço, e-mail, CPF)
+
+A transcrição rápida erra mais em dados ditados. Avise antes que a próxima resposta traz o dado: a Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, sem atrasar a conversa.
+
+```python
+await call.speak("Pra qual endereço eu mando?")
+endereco = await call.expect_slot("endereco", "address", description="rua, número e bairro")
+...
+elif isinstance(event, Decision):          # a decisão da resposta chega no ritmo normal
+    resultado = await endereco             # o valor, lido pelo reconhecimento preciso
+    if resultado.found:
+        await call.speak(f"Anotado: {resultado.value}. Tá certo?")
+```
+
 ### Voz natural
 
 Toda fala do agente passa por `normalize_for_speech()` antes de ir para a voz, então você pode escrever como escreveria numa tela:

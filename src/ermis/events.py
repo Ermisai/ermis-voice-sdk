@@ -183,6 +183,15 @@ class Audio(Event):
 
 
 @dataclass(frozen=True)
+class TranscriptRevised(Event):
+    """A leitura de maior precisão de uma fala (pedida com ``expect_slot``) ficou diferente da rápida."""
+
+    utterance_id: str
+    text: str
+    previous: str
+
+
+@dataclass(frozen=True)
 class UnknownEvent(Event):
     """Evento que esta versão do SDK ainda não conhece. Veja ``raw``."""
 
@@ -230,6 +239,10 @@ def parse_event(msg: dict[str, Any]) -> Event:
         )
     if t == "slot":
         return SlotResult(t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"))
+    if t == "transcript.revised":
+        return TranscriptRevised(
+            t, msg, utterance_id=g("utterance_id", ""), text=g("text") or "", previous=g("previous") or ""
+        )
     if t == "speak.started":
         return SpeakStarted(t, msg, id=g("id", ""), chars=g("chars"))
     if t == "speak.done":

@@ -269,6 +269,33 @@ class Call:
         """Avisa que o áudio de ``speak_id`` terminou de tocar do seu lado. Só no transporte ``websocket``."""
         await self.send({"type": "playback_finished", "id": speak_id})
 
+    async def expect_slot(
+        self, name: str, type: str = "text", *, description: str | None = None
+    ) -> asyncio.Future[SlotResult]:
+        """Avisa que a próxima resposta do cliente traz um dado (endereço, e-mail, CPF...).
+
+        A Ermis lê essa resposta também com o reconhecimento de maior precisão, em segundo plano, e o valor
+        chega no ``Future`` devolvido (``await`` quando precisar dele). A conversa segue no ritmo normal:
+        ``Transcript`` e ``Decision`` dessa fala chegam como sempre, e ``TranscriptRevised`` se a leitura
+        precisa mudou o texto::
+
+            await call.speak("Pra qual endereço eu mando?")
+            endereco = await call.expect_slot("endereco", "address")
+            ...
+            # na Decision da resposta:
+            resultado = await endereco
+        """
+        if self.ended is not None:
+            raise ConnectionClosedError("a sessão já terminou")
+        slot: dict[str, Any] = {"name": name, "type": type}
+        if description:
+            slot["description"] = description
+        req_id = _new_id("e")
+        fut: asyncio.Future[SlotResult] = asyncio.get_running_loop().create_future()
+        self._pending[req_id] = fut
+        await self.send({"type": "expect_slot", "id": req_id, "slot": slot})
+        return fut
+
     async def _request(self, prefix: str, msg: dict[str, Any], timeout: float) -> Any:
         if self.ended is not None:
             raise ConnectionClosedError("a sessão já terminou")

@@ -170,6 +170,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `{"type": "interrupt"}` | Para a fala atual do agente |
 | `{"type": "decide", "id": "d1", "text": "…", "custom_intents": […]}` | Pede uma decisão, com intenções suas ([ver abaixo](#intenções-customizadas)) |
 | `{"type": "extract_slot", "id": "s1", "text": "…", "slot": {"name": "email", "type": "email"}}` | Extrai um dado da fala |
+| `{"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address"}}` | A próxima resposta do cliente traz esse dado. A Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, e manda o `slot` com o valor (ver [Dados importantes](#dados-importantes-endereço-e-mail-documentos)) |
 | `{"type": "set_custom_intents", "custom_intents": […]}` | Troca as intenções suas avaliadas nas próximas decisões automáticas (por exemplo, a cada etapa da conversa); `[]` desliga |
 | `{"type": "set_vocabulary", "vocabulary": […]}` | Troca o vocabulário das próximas falas; `[]` desliga |
 | `{"type": "thinking", "message": "…", "timeout_ms": 45000}` | A resposta vai demorar: o agente fala `message` agora e espera até `timeout_ms` neste turno ([ver abaixo](#avisar-que-vai-demorar-thinking)) |
@@ -187,7 +188,8 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `speech.ended` | O cliente parou de falar | `duration_ms` |
 | `transcript` | Fala transcrita | `utterance_id`, `text`, `uncertain`, `assessment`, `latency_ms`; `corrections` quando palavras foram ajustadas ao seu `vocabulary` |
 | `decision` | Decisão sobre a fala (com `auto_decide` ou após `decide`) | `utterance_id` ou `id`, `intent`, `action`, `is_escape`, `complexity`, `custom_intent`, `extracted` |
-| `slot` | Resposta a `extract_slot` | `id`, `value`, `status` (`found`, `not_found` ou `rejected`: a fala não responde ao que foi pedido) |
+| `slot` | Resposta a `extract_slot` ou a `expect_slot` (com `utterance_id`) | `id`, `value`, `status` (`found`, `not_found` ou `rejected`: a fala não responde ao que foi pedido) |
+| `transcript.revised` | A leitura de maior precisão de uma fala ficou diferente (só com `expect_slot`) | `utterance_id`, `text`, `previous` |
 | `speak.started` / `speak.done` | Início e fim de uma fala do agente | `id`, `chars` |
 | `barge_in` | O cliente interrompeu o agente | `id` da fala interrompida |
 | `waiting` | O agente falou uma mensagem de espera | `utterance_id`, `kind` (`filler`, `patience`, `timeout`), `text` |
@@ -224,6 +226,10 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
 | `extracted.name` | Nome do cliente, quando ele se apresenta ou corrige o nome |
+
+
+
+No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
 ### Vocabulário do seu negócio
 
