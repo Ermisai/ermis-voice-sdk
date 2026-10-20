@@ -135,6 +135,7 @@ Base: `https://api.ermis.ai`
 | `barge_in.enabled` | bool | `true` | Permite que o cliente interrompa o agente |
 | `barge_in.min_speech_ms` | int | `150` | Fala contínua necessária para interromper |
 | `max_duration_s` | int | `1800` | Duração máxima da sessão |
+| `vocabulary` | lista | `[]` | Palavras do seu negócio (sabores, serviços, produtos; até 200). Quando o cliente fala uma delas e a transcrição sai parecida ("marquerita"), o texto já chega corrigido ("margherita"), antes das decisões ([ver abaixo](#vocabulário-do-seu-negócio)) |
 | `custom_intents` | lista | `[]` | Intenções do seu negócio (`key`, `label`, `description`; até 20). Cada decisão automática já traz `custom_intent` com a escolhida, sem pedido extra ([ver abaixo](#intenções-customizadas)) |
 | `waiting` | objeto | [ver abaixo](#enquanto-a-sua-ia-pensa) | Mensagens de espera e tempo limite enquanto a sua IA prepara a resposta |
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
@@ -170,6 +171,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `{"type": "decide", "id": "d1", "text": "…", "custom_intents": […]}` | Pede uma decisão, com intenções suas ([ver abaixo](#intenções-customizadas)) |
 | `{"type": "extract_slot", "id": "s1", "text": "…", "slot": {"name": "email", "type": "email"}}` | Extrai um dado da fala |
 | `{"type": "set_custom_intents", "custom_intents": […]}` | Troca as intenções suas avaliadas nas próximas decisões automáticas (por exemplo, a cada etapa da conversa); `[]` desliga |
+| `{"type": "set_vocabulary", "vocabulary": […]}` | Troca o vocabulário das próximas falas; `[]` desliga |
 | `{"type": "thinking", "message": "…", "timeout_ms": 45000}` | A resposta vai demorar: o agente fala `message` agora e espera até `timeout_ms` neste turno ([ver abaixo](#avisar-que-vai-demorar-thinking)) |
 | `{"type": "done_processing"}` | Você decidiu não responder esta fala (por exemplo, era ruído). O agente volta a ouvir |
 | `{"type": "end"}` | Encerra a sessão |
@@ -183,7 +185,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `session.started` | Áudio conectado | `session_id`, `limits` |
 | `speech.started` | O cliente começou a falar | — |
 | `speech.ended` | O cliente parou de falar | `duration_ms` |
-| `transcript` | Fala transcrita | `utterance_id`, `text`, `uncertain`, `assessment`, `latency_ms` |
+| `transcript` | Fala transcrita | `utterance_id`, `text`, `uncertain`, `assessment`, `latency_ms`; `corrections` quando palavras foram ajustadas ao seu `vocabulary` |
 | `decision` | Decisão sobre a fala (com `auto_decide` ou após `decide`) | `utterance_id` ou `id`, `intent`, `action`, `is_escape`, `complexity`, `custom_intent`, `extracted` |
 | `slot` | Resposta a `extract_slot` | `id`, `value`, `status` (`found`, `not_found` ou `rejected`: a fala não responde ao que foi pedido) |
 | `speak.started` / `speak.done` | Início e fim de uma fala do agente | `id`, `chars` |
@@ -222,6 +224,18 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
 | `extracted.name` | Nome do cliente, quando ele se apresenta ou corrige o nome |
+
+### Vocabulário do seu negócio
+
+O reconhecimento de fala conhece o português do dia a dia, mas não o seu cardápio, os seus serviços ou os nomes dos seus produtos. Liste essas palavras em `vocabulary` ao criar a sessão: quando a transcrição sair parecida com uma delas pelo som ("marquerito", "carabeço"), a Ermis troca pela palavra certa ("margherita", "calabresa") antes das decisões. Assim as intenções, a extração de dados e o seu código recebem o texto já certo.
+
+```json
+{"transport": "twilio", "vocabulary": ["margherita", "calabresa", "quatro queijos", "frango com catupiry"]}
+```
+
+O `transcript` traz em `corrections` o que foi ajustado (`heard`, `term`, `score`). Palavras comuns, números e nomes de pessoas não são trocados. Use termos que o cliente fala, não códigos internos.
+
+No SDK: `sessions.create(vocabulary=[...])` e `call.set_vocabulary([...])`; `Transcript.corrections` traz o que foi ajustado.
 
 ### Intenções customizadas
 

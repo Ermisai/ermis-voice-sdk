@@ -42,6 +42,7 @@ from .events import (
     parse_event,
 )
 from .options import BargeInOptions, VadOptions, WaitingOptions
+from .speech_text import normalize_for_speech, number_to_words
 
 __version__ = "0.2.0a1"
 
@@ -83,5 +84,7 @@ __all__ = [
     "WaitingOptions",
     "WaitingSpoken",
     "WarningEvent",
+    "normalize_for_speech",
+    "number_to_words",
     "parse_event",
 ]

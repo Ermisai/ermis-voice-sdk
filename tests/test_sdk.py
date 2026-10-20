@@ -89,6 +89,7 @@ async def test_session_turn_options_and_custom_intents():
         turn_detection="smart_turn",
         early_turn={"speculate": True, "close_on_complete_text": True},
         custom_intents=[CustomIntent("pedir_pizza", "Pede pizza", "tamanho e sabor"), {"key": "outro_assunto"}],
+        vocabulary=["margherita", "calabresa"],
     )
     assert seen[0] == {
         "transcription_priority": "local_first",
@@ -98,6 +99,7 @@ async def test_session_turn_options_and_custom_intents():
             {"key": "pedir_pizza", "label": "Pede pizza", "description": "tamanho e sabor"},
             {"key": "outro_assunto"},
         ],
+        "vocabulary": ["margherita", "calabresa"],
     }
 
 
@@ -382,3 +384,45 @@ async def test_set_custom_intents_command():
         },
         {"type": "set_custom_intents", "custom_intents": []},
     ]
+
+
+async def test_speech_is_normalized_unless_turned_off():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        for _ in range(4):
+            received.append(json.loads(await ws.recv()))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "transcript",
+                    "utterance_id": "u1",
+                    "text": "uma margherita",
+                    "assessment": {},
+                    "corrections": [{"heard": "marquerita", "term": "margherita", "score": 0.89}],
+                }
+            )
+        )
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        seen = []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                seen.append(event)
+                if isinstance(event, SessionStarted):
+                    await call.speak("**Fica R$ 49,90** 🍕")
+                    await call.speak("R$ 49,90", normalize=False)
+                    await call.set_vocabulary(["margherita"])
+                    call.normalize_text = False
+                    await call.speak("2 pizzas")
+        return seen
+
+    seen = await _with_server(handler, body)
+    assert received[0]["text"] == "Fica quarenta e nove reais e noventa centavos"
+    assert received[1]["text"] == "R$ 49,90"
+    assert received[2] == {"type": "set_vocabulary", "vocabulary": ["margherita"]}
+    assert received[3]["text"] == "2 pizzas"
+    transcript = next(e for e in seen if isinstance(e, Transcript))
+    assert transcript.corrections == [{"heard": "marquerita", "term": "margherita", "score": 0.89}]

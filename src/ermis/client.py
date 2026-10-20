@@ -98,6 +98,7 @@ class _Sessions:
         turn_detection: str = UNSET,
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
+        vocabulary: list[str] = UNSET,
         vad: VadOptions | dict[str, Any] = UNSET,
         barge_in: BargeInOptions | dict[str, Any] = UNSET,
         waiting: WaitingOptions | dict[str, Any] = UNSET,
@@ -108,6 +109,9 @@ class _Sessions:
 
         ``custom_intents`` (lista de ``CustomIntent``): as intenções do seu negócio. Cada ``Decision``
         automática já traz em ``custom_intent`` a que se aplica, sem chamar ``call.decide()``.
+
+        ``vocabulary`` (lista de palavras): termos do seu negócio (sabores, serviços, produtos). Quando a
+        transcrição sai parecida com um deles pelo som ("marquerita"), o texto já chega corrigido.
         """
         body = session_body(
             transport=transport,
@@ -119,6 +123,7 @@ class _Sessions:
             turn_detection=turn_detection,
             early_turn=early_turn,
             custom_intents=custom_intents,
+            vocabulary=vocabulary,
             vad=vad,
             barge_in=barge_in,
             waiting=waiting,
@@ -210,10 +215,14 @@ class Ermis:
         """Carteira oficial: balance, reserved_credits e available_credits."""
         return await self._request("GET", "/v1/account/balance")
 
-    def connect(self, session: Session | str) -> _CallConnector:
-        """Abre o canal de controle de ``session`` (ou de uma ``control_url``). Use com ``async with``."""
+    def connect(self, session: Session | str, *, normalize_text: bool = True) -> _CallConnector:
+        """Abre o canal de controle de ``session`` (ou de uma ``control_url``). Use com ``async with``.
+
+        ``normalize_text`` (padrão ``True``): cada fala passa por :func:`ermis.normalize_for_speech` antes de
+        ir para a voz (números por extenso, valores, datas, e-mails, sem markdown nem emojis).
+        """
         url = session.control_url if isinstance(session, Session) else session
-        return _CallConnector(url, self._auth())
+        return _CallConnector(url, self._auth(), normalize_text)
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -226,9 +235,10 @@ class Ermis:
 
 
 class _CallConnector:
-    def __init__(self, url: str, headers: dict[str, str]) -> None:
+    def __init__(self, url: str, headers: dict[str, str], normalize_text: bool) -> None:
         self._url = url
         self._headers = headers
+        self._normalize_text = normalize_text
         self._call: Call | None = None
 
     async def __aenter__(self) -> Call:
@@ -236,7 +246,7 @@ class _CallConnector:
             ws = await ws_connect(self._url, additional_headers=self._headers, max_size=2**22)
         except InvalidStatus as exc:
             raise from_http(exc.response.status_code, "não foi possível abrir o canal de controle") from exc
-        self._call = Call(ws)
+        self._call = Call(ws, normalize_text=self._normalize_text)
         self._call._start()
         return self._call
 

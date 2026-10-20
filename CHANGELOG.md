@@ -2,6 +2,8 @@
 
 ## Não lançado
 
+- Voz natural automática: toda fala passa por `normalize_for_speech()` antes de ir para a voz (números e valores por extenso, com gênero, datas, horas, porcentagens, CPF, CEP e telefone em grupos, e-mails e sites lidos, sem markdown nem emojis). Desligue com `ermis.connect(session, normalize_text=False)` ou `speak(..., normalize=False)`. `normalize_for_speech()` e `number_to_words()` também podem ser usados direto.
+- `sessions.create(vocabulary=[...])` e `call.set_vocabulary()`: palavras do seu negócio; a transcrição chega corrigida na direção delas ("marquerita" -> "margherita"). `Transcript.corrections` lista os ajustes.
 - `sessions.create(custom_intents=[CustomIntent(...)])`: as intenções do seu negócio vêm em cada `Decision` automática (`custom_intent`), sem chamar `call.decide()`; `call.set_custom_intents()` troca as intenções no meio da ligação.
 - Opções `turn_detection` (`smart_turn` ou `silence`) e `early_turn`, e `transcription_priority` aceita `local_first` e `local_only`.
 - `ermis.voices.list()`: vozes disponíveis para a conta (`Voice`: `id`, `name`, `gender`, `language`, `production`, `default`); use o `id` em `sessions.create(voice=...)`.

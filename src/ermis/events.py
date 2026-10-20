@@ -65,6 +65,8 @@ class Transcript(Event):
     uncertain: bool
     assessment: Assessment
     latency_ms: int | None
+    corrections: list[dict[str, Any]] = field(default_factory=list)
+    """Palavras ajustadas ao ``vocabulary`` da sessão: ``{"heard", "term", "score"}``."""
 
 
 @dataclass(frozen=True)
@@ -211,6 +213,7 @@ def parse_event(msg: dict[str, Any]) -> Event:
             uncertain=bool(g("uncertain")),
             assessment=assessment,
             latency_ms=g("latency_ms"),
+            corrections=list(g("corrections") or []),
         )
     if t == "decision":
         return Decision(

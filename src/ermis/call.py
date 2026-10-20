@@ -15,6 +15,7 @@ from websockets.exceptions import ConnectionClosed
 
 from .errors import ConnectionClosedError, ErmisError, InvalidRequestError, from_close_code
 from .events import Audio, BargeIn, Decision, ErrorEvent, Event, SessionEnded, SlotResult, SpeakDone, parse_event
+from .speech_text import normalize_for_speech
 
 
 @dataclass(frozen=True)
@@ -50,8 +51,9 @@ class Call:
     desses métodos e não aparecem na iteração.
     """
 
-    def __init__(self, ws: ClientConnection) -> None:
+    def __init__(self, ws: ClientConnection, *, normalize_text: bool = True) -> None:
         self._ws = ws
+        self.normalize_text = normalize_text
         self._events: asyncio.Queue[Any] = asyncio.Queue()
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._speaking: dict[str, asyncio.Future[bool]] = {}
@@ -161,12 +163,17 @@ class Call:
         voice: str | None = None,
         allow_barge_in: bool | None = None,
         calibrate: bool | None = None,
+        normalize: bool | None = None,
     ) -> str:
         """O agente fala ``text``. Devolve o ``id`` da fala na hora, sem esperar o áudio terminar.
 
         - ``calibrate=True`` na saudação: a Ermis mede o ruído de fundo enquanto o cliente escuta.
         - ``allow_barge_in=False`` para avisos que não podem ser interrompidos.
+        - ``normalize``: escreve o texto do jeito que se fala ("R$ 49,90" -> "quarenta e nove reais e noventa
+          centavos"); padrão do ``connect(..., normalize_text=True)``.
         """
+        if self.normalize_text if normalize is None else normalize:
+            text = normalize_for_speech(text)
         speak_id = id or _new_id("r")
         msg: dict[str, Any] = {"type": "speak", "id": speak_id, "text": text}
         for key, value in (("voice", voice), ("allow_barge_in", allow_barge_in), ("calibrate", calibrate)):
@@ -230,6 +237,10 @@ class Call:
         if timeout_ms is not None:
             msg["timeout_ms"] = timeout_ms
         await self.send(msg)
+
+    async def set_vocabulary(self, vocabulary: list[str]) -> None:
+        """Troca o vocabulário das próximas falas (``[]`` desliga)."""
+        await self.send({"type": "set_vocabulary", "vocabulary": list(vocabulary)})
 
     async def set_custom_intents(self, custom_intents: list[CustomIntent | dict[str, Any]]) -> None:
         """Troca as intenções avaliadas nas próximas decisões automáticas (``[]`` desliga)."""

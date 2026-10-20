@@ -137,12 +137,13 @@ Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ER
 | `await ermis.sessions.end(session_id)` | `DELETE /v1/voice/sessions/{id}` | `None` |
 | `await ermis.usage(limit=50, before=None)` | `GET /v1/usage` | `dict` com `entries` e `next_cursor` |
 | `await ermis.balance()` | `GET /v1/account/balance` | `dict` |
-| `ermis.connect(session_or_control_url)` | WebSocket `control_url` | `Call` (use com `async with`) |
+| `await ermis.voices.list()` | `GET /v1/voice/voices` | `list[Voice]` (`id`, `name`, `gender`, `production`, `default`) |
+| `ermis.connect(session_or_control_url, normalize_text=True)` | WebSocket `control_url` | `Call` (use com `async with`) |
 
 `usage()` devolve os lançamentos de crédito em páginas: passe o `next_cursor` recebido em `before` para buscar a página seguinte (`limit` de 1 a 100). `balance()` devolve `balance`, `reserved_credits` (reservado por ligações em andamento) e `available_credits`, em créditos inteiros.
 
 **Opções de `sessions.create`** (todas opcionais; o que você não passar usa o padrão da API):
-`transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice`, `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`.
+`transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice` (um `id` de `voices.list()`), `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`, `"local_first"`, `"local_only"`), `turn_detection` (`"smart_turn"`, `"silence"`), `early_turn={"speculate": True, "close_on_complete_text": True}`, `custom_intents=[CustomIntent(…)]` (as intenções do seu negócio, respondidas em cada `Decision`), `vocabulary=[…]` (palavras do seu negócio: a transcrição chega corrigida), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`.
 
 ```python
 from ermis import WaitingOptions
@@ -160,6 +161,17 @@ waiting = WaitingOptions(
     timeout_action="apologize",                # ou "end"
 )
 ```
+
+### Voz natural
+
+Toda fala do agente passa por `normalize_for_speech()` antes de ir para a voz, então você pode escrever como escreveria numa tela:
+
+```python
+await call.speak("Seu pedido de 2 pizzas fica **R$ 109,80** e chega às 20h30 🍕")
+# a voz fala: "Seu pedido de duas pizzas fica cento e nove reais e oitenta centavos e chega às vinte horas e trinta"
+```
+
+Números e valores por extenso (com gênero: "duas pizzas"), datas, horas, porcentagens, ordinais, CPF, CEP e telefone lidos em grupos, e-mails e sites ("arroba", "ponto"), abreviações comuns, e sem markdown nem emojis. Desligue com `ermis.connect(session, normalize_text=False)` ou só numa fala com `speak(..., normalize=False)`. Para usar no seu próprio texto: `from ermis import normalize_for_speech`.
 
 ### `Session`
 

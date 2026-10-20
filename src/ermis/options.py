@@ -93,6 +93,7 @@ def session_body(
     turn_detection: Literal["smart_turn", "silence"] = UNSET,
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
+    vocabulary: list[str] = UNSET,
     vad: VadOptions | dict[str, Any] = UNSET,
     barge_in: BargeInOptions | dict[str, Any] = UNSET,
     waiting: WaitingOptions | dict[str, Any] = UNSET,
@@ -112,6 +113,7 @@ def session_body(
         "custom_intents": custom_intents
         if custom_intents is UNSET
         else [i if isinstance(i, dict) else asdict(i) for i in custom_intents],
+        "vocabulary": vocabulary,
         "vad": vad,
         "barge_in": barge_in,
         "waiting": waiting,
