@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Prévia (0.2.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
+> **Prévia (0.3.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
@@ -119,8 +119,9 @@ Exemplo completo, com respostas rápidas, confirmação, desistência e despedid
 |---|---|
 | [`primeira_ligacao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/primeira_ligacao.py) | Fale com o agente sem telefone: envia um WAV gravado e salva a resposta em `resposta.wav` |
 | [`atendente_twilio.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py) | Atendente geral por telefone: frases prontas, sua IA, confirmação, desistência e despedida |
-| [`agendamento.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py) | Marcar, remarcar e cancelar consultas: intenções do negócio, horários como opções faladas, nome e telefone ditados, confirmação |
-| [`ura.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para financeiro, suporte ou vendas |
+| [`agendamento.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py) | Marcar, remarcar e cancelar consultas: intenções do negócio na sessão, horários como opções faladas (`set_custom_intents`), telefone com `expect_slot`, confirmação |
+| [`ura.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para financeiro, suporte ou vendas; CPF com `expect_slot` |
+| [`pizzaria.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/pizzaria.py) | Pedidos de pizza por objetivos (nome, pizzas, endereço): `vocabulary` do cardápio, endereço com `expect_slot`, dúvidas no meio do pedido, `unclear` e `off_topic` |
 
 Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio; o passo a passo está em [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md#6-ligação-de-verdade-pelo-twilio).
 

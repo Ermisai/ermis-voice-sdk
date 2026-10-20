@@ -1,7 +1,10 @@
 # Changelog
 
-## Não lançado
+## 0.3.0a1 (prévia)
 
+Requer a Ermis Voice API 0.3.0.
+
+- Exemplos atualizados (`agendamento.py`, `ura.py`) e novo `pizzaria.py`; prompt para IA e `llms.txt` com os recursos novos.
 - `Decision.unclear` (fala confusa: peça para repetir), `Decision.off_topic` (assunto fora do seu negócio) e `Decision.business_intent()` (a sua intenção, ou `"other"` quando a escolha não é segura).
 - `Decision.custom_intent_confidence`: quanto a escolha de `custom_intent` é segura (abaixo de 0,8, trate como `other`); veja "Fala confusa ou fora do assunto" na documentação. `Decision.complexity` agora é decimal, como na API.
 - `call.expect_slot(nome, tipo)`: avisa que a próxima resposta traz um dado (endereço, e-mail, CPF); a Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, e o valor chega no `Future` devolvido. Novo evento `TranscriptRevised` com a frase corrigida.

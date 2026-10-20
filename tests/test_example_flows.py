@@ -1,7 +1,8 @@
 """Roda examples/agendamento.py e examples/ura.py contra uma Voice API simulada.
 
 A API simulada faz o papel do cliente: a cada fala do agente, envia a próxima fala do
-roteiro (transcript + decision) e responde a ``decide`` e ``extract_slot``.
+roteiro (transcript + decision, já com o ``custom_intent`` das intenções da sessão) e responde a
+``decide``, ``extract_slot`` e ``expect_slot`` (o valor da próxima resposta).
 """
 
 from __future__ import annotations
@@ -55,6 +56,11 @@ async def _run(module, falas, decisoes, slots, **kwargs):
                         }
                     )
                 )
+            elif kind == "expect_slot":
+                # Lida pelo reconhecimento preciso: o valor chega depois da decisão da resposta
+                value = slots.get(msg["slot"]["name"])
+                status = "found" if value else "not_found"
+                await ws.send(json.dumps({"type": "slot", "id": msg["id"], "value": value, "status": status}))
             elif kind == "extract_slot":
                 value = slots.get(msg["slot"]["name"])
                 status = "found" if value else "not_found"
@@ -75,6 +81,8 @@ async def _run(module, falas, decisoes, slots, **kwargs):
                             "intent": intent,
                             "action": "escalate",
                             "is_escape": escape,
+                            "custom_intent": decisoes.get(texto, "other"),
+                            "custom_intent_confidence": 1.0,
                         }
                     )
                 )
@@ -165,3 +173,28 @@ async def test_ivr_falls_back_to_an_agent(monkeypatch):
     received = await _run(exemplo, falas, {}, {})
     assert _said(received)[-1] == exemplo.AVISOS["atendente"]
     assert transferidos == ["atendente"]
+
+
+async def test_pizzeria_takes_an_order_with_the_address_read_by_the_precise_recognizer(monkeypatch):
+    exemplo = _load(monkeypatch, "pizzaria")
+    falas = [
+        ("é o João", "name_provide", False),
+        ("uma grande de calabresa", "complex", False),
+        ("não, só isso", "confirm_no", False),
+        ("rodas flores dez centro", "complex", False),
+        ("sim, pode confirmar", "confirm_yes", False),
+    ]
+    decisoes = {"uma grande de calabresa": "pedir_pizza", "rodas flores dez centro": "informar_endereco"}
+    slots = {"nome": "João", "endereco": "Rua das Flores, 10, Centro"}
+    received = await _run(exemplo, falas, decisoes, slots)
+
+    said = _said(received)
+    assert said[1] == "Prazer, João! O que vai ser hoje?"
+    assert said[2] == "Anotado, uma grande de calabresa. Quer mais alguma pizza?"
+    expect = next(m for m in received if m["type"] == "expect_slot")
+    assert expect["slot"]["name"] == "endereco" and expect["slot"]["type"] == "address"
+    # The address came from expect_slot (the precise reading), and the voice reads "10" as "dez"
+    assert "pra entregar na Rua das Flores, dez, Centro" in said[4]
+    assert said[-1].startswith("Prontinho, pedido feito!")
+    session = exemplo.INTENCOES and exemplo.VOCABULARIO
+    assert "margherita" in session

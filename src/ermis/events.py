@@ -115,7 +115,11 @@ class Decision(Event):
 
     @property
     def off_topic(self) -> bool:
-        """Uma pergunta ou pedido claro sobre algo que não é do seu negócio ("vocês vendem celular?")."""
+        """Uma pergunta ou pedido claro sobre algo que não é do seu negócio ("vocês vendem celular?").
+
+        Use depois de tentar ler o que a etapa espera: respostas de dados ("sexta-feira", "Rua 7") também
+        chegam sem intenção do negócio e podem vir com este valor.
+        """
         return (
             not self.unclear
             and not self.is_escape
