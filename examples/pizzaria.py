@@ -364,6 +364,7 @@ async def conduzir(call: Call) -> None:
     async for event in call:
         if isinstance(event, SessionStarted):
             await call.speak(SAUDACAO, calibrate=True)
+            await call.expect_precise()  # a resposta é um nome, em uma ou duas palavras
 
         elif isinstance(event, Transcript):
             if event.assessment.ignore:
@@ -387,20 +388,20 @@ async def conduzir(call: Call) -> None:
                     await call.speak(f"Vamos voltar {ASSUNTO}? {proximo_objetivo(pedido)}")
                 else:
                     await call.speak(REPETIR)
-                if not encerrando and pedido.etapa in ("pizzas", "mais"):
+                if not encerrando and pedido.etapa in ("nome", "pizzas", "mais"):
                     await call.expect_precise()
                 continue
             confusas = 0
             if event.drifting:  # o cliente divagou: reconhece e volta à pergunta em que estava
                 await call.speak(f"Tá bom! Voltando {ASSUNTO}: {proximo_objetivo(pedido)}")
-                if pedido.etapa in ("pizzas", "mais"):
+                if pedido.etapa in ("nome", "pizzas", "mais"):
                     await call.expect_precise()
                 continue
             resposta, fim = await responder(call, pedido, falas.get(event.utterance_id or "", ""), event)
             encerrando = fim
             await call.speak(resposta, allow_barge_in=not fim)
-            if not fim and pedido.etapa in ("pizzas", "mais"):
-                # Sabor e tamanho em uma ou duas palavras: a resposta sai do reconhecimento preciso
+            if not fim and pedido.etapa in ("nome", "pizzas", "mais"):
+                # Nome, sabor e tamanho em uma ou duas palavras: a resposta sai do reconhecimento preciso
                 await call.expect_precise()
             if pedido.etapa == "endereco" and pedido.esperado is None:
                 # A próxima resposta é o endereço: o Ermis Voice lê com o reconhecimento preciso
