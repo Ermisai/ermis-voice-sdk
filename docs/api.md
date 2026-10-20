@@ -253,6 +253,8 @@ No SDK: `sessions.create(vocabulary=[...])` e `call.set_vocabulary([...])`; `Tra
 - **Fala confusa** (transcrição ruim, frase sem sentido): a `decision` vem com `action` igual a `clarify`. Peça para repetir quando, além disso, a fala não trouxer nenhuma intenção sua com segurança (`custom_intent` `other` ou `custom_intent_confidence` abaixo de 0,8). Respostas curtas e válidas ("grande", "não, só isso") também podem vir com `clarify`, por isso olhe as duas coisas.
 - **Fora do assunto** ("vocês vendem celular?", "vai chover amanhã?"): `custom_intent` vem `other` com confiança alta e `action` diferente de `clarify`. Diga educadamente o que o agente faz e volte à pergunta em que estava.
 
+No SDK, a `Decision` já faz essa leitura: `decision.unclear`, `decision.off_topic` e `decision.business_intent()`.
+
 ### Dados importantes: endereço, e-mail, documentos
 
 Endereços, e-mails e números ditados são onde a transcrição rápida mais erra ("rodas flores" no lugar de "Rua das Flores"). Quando fizer a pergunta, avise que a próxima resposta traz o dado:

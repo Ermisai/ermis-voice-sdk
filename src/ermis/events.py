@@ -69,6 +69,9 @@ class Transcript(Event):
     """Palavras ajustadas ao ``vocabulary`` da sessão: ``{"heard", "term", "score"}``."""
 
 
+_PLAIN_ANSWERS = ("confirm_yes", "confirm_no", "name_provide", "name_correction", "farewell", "thanks", "greeting")
+
+
 @dataclass(frozen=True)
 class Decision(Event):
     """O que o cliente final quer.
@@ -88,6 +91,37 @@ class Decision(Event):
     id: str | None = None
     custom_intent_confidence: float | None = None
     """De 0 a 1: quanto a escolha de ``custom_intent`` é segura. Abaixo de 0,8 é um palpite (frase confusa)."""
+
+    def business_intent(self, min_confidence: float = 0.8) -> str:
+        """A sua intenção (``custom_intent``), ou ``"other"`` quando a escolha não é segura."""
+        if not self.custom_intent:
+            return "other"
+        confidence = 1.0 if self.custom_intent_confidence is None else self.custom_intent_confidence
+        return self.custom_intent if confidence >= min_confidence else "other"
+
+    @property
+    def unclear(self) -> bool:
+        """Fala confusa (transcrição ruim, frase sem sentido): peça para repetir em vez de agir num palpite.
+
+        A Ermis pediu esclarecimento (``action == "clarify"``) e nenhuma intenção sua veio segura. Respostas
+        curtas válidas ("sim", "não, só isso", um nome) não contam.
+        """
+        return (
+            self.action == "clarify"
+            and not self.is_escape
+            and self.business_intent() == "other"
+            and self.intent not in _PLAIN_ANSWERS
+        )
+
+    @property
+    def off_topic(self) -> bool:
+        """Uma pergunta ou pedido claro sobre algo que não é do seu negócio ("vocês vendem celular?")."""
+        return (
+            not self.unclear
+            and not self.is_escape
+            and self.business_intent() == "other"
+            and self.intent in ("question_product", "question_service", "complex", "complaint")
+        )
 
 
 @dataclass(frozen=True)

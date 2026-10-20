@@ -473,3 +473,25 @@ async def test_expect_slot_value_arrives_after_the_decision():
     assert values[0].found and values[0].value == "Rua das Flores, 10"
     revised = next(e for e in seen if isinstance(e, TranscriptRevised))
     assert revised.text == "Rua das Flores, 10" and revised.previous == "rodas flores dez"
+
+
+def test_decision_tells_unclear_and_off_topic_speech():
+    def decision(**fields):
+        return parse_event({"type": "decision", "utterance_id": "u1", **fields})
+
+    # "eu queria saber se vai xouver o janeite": garbled, a weak pick of a business intent
+    garbled = decision(
+        intent="question_service", action="clarify", custom_intent="cardapio", custom_intent_confidence=0.67
+    )
+    assert garbled.unclear and garbled.business_intent() == "other" and not garbled.off_topic
+    # Valid short answers also come with clarify
+    assert not decision(
+        intent="name_provide", action="clarify", custom_intent="pedir", custom_intent_confidence=0.92
+    ).unclear
+    assert not decision(
+        intent="farewell", action="clarify", custom_intent="other", custom_intent_confidence=0.92
+    ).unclear
+    off = decision(intent="question_product", action="escalate", custom_intent="other", custom_intent_confidence=0.98)
+    assert off.off_topic and not off.unclear
+    sure = decision(intent="complex", action="escalate", custom_intent="pedir", custom_intent_confidence=1.0)
+    assert sure.business_intent() == "pedir" and not sure.off_topic
