@@ -81,11 +81,13 @@ class Decision(Event):
     action: str
     """``respond`` (frase pronta resolve), ``escalate`` (sua IA ou um humano) ou ``clarify``."""
     is_escape: bool
-    complexity: int
+    complexity: float
     custom_intent: str | None
     extracted: dict[str, Any]
     utterance_id: str | None = None
     id: str | None = None
+    custom_intent_confidence: float | None = None
+    """De 0 a 1: quanto a escolha de ``custom_intent`` é segura. Abaixo de 0,8 é um palpite (frase confusa)."""
 
 
 @dataclass(frozen=True)
@@ -231,11 +233,12 @@ def parse_event(msg: dict[str, Any]) -> Event:
             intent=g("intent", "unclear"),
             action=g("action", "escalate"),
             is_escape=bool(g("is_escape")),
-            complexity=int(g("complexity") or 0),
+            complexity=float(g("complexity") or 0),
             custom_intent=g("custom_intent"),
             extracted=g("extracted") or {},
             utterance_id=g("utterance_id"),
             id=g("id"),
+            custom_intent_confidence=g("custom_intent_confidence"),
         )
     if t == "slot":
         return SlotResult(t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"))
