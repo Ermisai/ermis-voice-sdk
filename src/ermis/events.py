@@ -69,6 +69,7 @@ class Transcript(Event):
     """Palavras ajustadas ao ``vocabulary`` da sessão: ``{"heard", "term", "score"}``."""
 
 
+DRIFT_WORDS = 10  # a partir daqui, uma fala sem nada do negócio é divagação
 _PLAIN_ANSWERS = ("confirm_yes", "confirm_no", "name_provide", "name_correction", "farewell", "thanks", "greeting")
 
 
@@ -91,6 +92,8 @@ class Decision(Event):
     id: str | None = None
     custom_intent_confidence: float | None = None
     """De 0 a 1: quanto a escolha de ``custom_intent`` é segura. Abaixo de 0,8 é um palpite (frase confusa)."""
+    text: str = ""
+    """O que o cliente disse (o ``Transcript`` da mesma fala; preenchido pelo ``Call``)."""
 
     def business_intent(self, min_confidence: float = 0.8) -> str:
         """A sua intenção (``custom_intent``), ou ``"other"`` quando a escolha não é segura."""
@@ -98,6 +101,13 @@ class Decision(Event):
             return "other"
         confidence = 1.0 if self.custom_intent_confidence is None else self.custom_intent_confidence
         return self.custom_intent if confidence >= min_confidence else "other"
+
+    @property
+    def _plain_answer(self) -> bool:
+        # "sim", "não, só isso", um nome: respostas curtas. Uma frase longa lida como nome é divagação
+        if self.intent in ("name_provide", "name_correction"):
+            return len(self.text.split()) <= 5 if self.text else True
+        return self.intent in _PLAIN_ANSWERS
 
     @property
     def unclear(self) -> bool:
@@ -110,7 +120,8 @@ class Decision(Event):
             self.action == "clarify"
             and not self.is_escape
             and self.business_intent() == "other"
-            and self.intent not in _PLAIN_ANSWERS
+            and not self._plain_answer
+            and not self.drifting
         )
 
     @property
@@ -121,10 +132,26 @@ class Decision(Event):
         chegam sem intenção do negócio e podem vir com este valor.
         """
         return (
-            not self.unclear
+            self.action != "clarify"
             and not self.is_escape
             and self.business_intent() == "other"
+            and not self._plain_answer
             and self.intent in ("question_product", "question_service", "complex", "complaint")
+        )
+
+    @property
+    def drifting(self) -> bool:
+        """O cliente está divagando: uma fala longa (10 palavras ou mais) sem nada do seu negócio.
+
+        Reconheça em poucas palavras e volte à pergunta em que estava ("Tá bom! Voltando ao seu pedido: ...").
+        Precisa do texto da fala (``text``, que o ``Call`` preenche).
+        """
+        return (
+            not self.is_escape
+            and self.business_intent() == "other"
+            and not self._plain_answer
+            and len(self.text.split()) >= DRIFT_WORDS
+            and not (self.action != "clarify" and self.intent in ("question_product", "question_service"))
         )
 
 

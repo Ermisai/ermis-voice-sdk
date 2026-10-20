@@ -4,6 +4,8 @@
 
 Requer a Ermis Voice API 0.3.0.
 
+- `call.expect_precise()`: a próxima resposta sai do reconhecimento de maior precisão, com a `Decision` já sobre esse texto (para itens do cardápio, tamanhos, quantidades).
+- `Decision.text` (o que o cliente disse, preenchido pelo `Call`) e `Decision.drifting` (divagação: fala longa sem nada do seu negócio). Uma frase longa lida como nome não conta mais como resposta curta.
 - Exemplos atualizados (`agendamento.py`, `ura.py`) e novo `pizzaria.py`; prompt para IA e `llms.txt` com os recursos novos.
 - `Decision.unclear` (fala confusa: peça para repetir), `Decision.off_topic` (assunto fora do seu negócio) e `Decision.business_intent()` (a sua intenção, ou `"other"` quando a escolha não é segura).
 - `Decision.custom_intent_confidence`: quanto a escolha de `custom_intent` é segura (abaixo de 0,8, trate como `other`); veja "Fala confusa ou fora do assunto" na documentação. `Decision.complexity` agora é decimal, como na API.

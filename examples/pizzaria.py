@@ -35,6 +35,7 @@ _conversas: set[asyncio.Task] = set()
 
 SAUDACAO = "Oi, boa noite! Pizzaria Bella Napoli, aqui é o Rafael. Com quem eu falo?"
 DESPEDIDA = "Eu que agradeço! Tenha um ótimo dia."
+ASSUNTO = "ao seu pedido"  # para voltar ao assunto depois de um desvio
 REPETIR = "Desculpa, não entendi direito. Pode repetir?"
 DESISTIR = "Tô com dificuldade pra te ouvir. Tenta ligar de novo, por favor. Até mais!"
 TRANSFERIR = "Vou te passar para um atendente. Um momento, por favor."
@@ -53,6 +54,7 @@ INTENCOES = [
     CustomIntent("perguntar_pagamento", "Pergunta sobre pagamento", "formas de pagamento, pix, cartão, troco"),
     CustomIntent("perguntar_horario", "Pergunta de horário de funcionamento", "que horas abre ou fecha"),
     CustomIntent("pedir_pizza", "Pede pizza", "diz tamanho, sabor ou quantidade de pizza que quer"),
+    CustomIntent("perguntar_atendente", "Pergunta com quem está falando", "nome do atendente, se é robô ou pessoa"),
     CustomIntent("informar_endereco", "Informa endereço", "rua, número, bairro de entrega"),
     CustomIntent("mudar_pedido", "Quer mudar o pedido", "trocar, tirar ou acrescentar pizza, mudar endereço"),
 ]
@@ -79,7 +81,7 @@ SABORES = {
     "margherita": ("margherita", "marguerita", "margarita"),
     "portuguesa": ("portuguesa",),
     "pepperoni": ("pepperoni", "peperoni"),
-    "chocolate": ("chocolate", "brigadeiro"),
+    "chocolate": ("chocolate", "brigadeiro", "doce"),  # a única pizza doce: "metade doce"
 }
 QUANTIDADES = {"uma": 1, "um": 1, "duas": 2, "dois": 2, "tres": 3}
 PRECOS = (
@@ -95,6 +97,7 @@ RESPOSTAS = {
     "perguntar_entrega": "Chega em uns quarenta, cinquenta minutos, e a entrega é grátis acima de cinquenta reais.",
     "perguntar_pagamento": "Pode pagar no pix, no cartão ou em dinheiro, na entrega.",
     "perguntar_horario": "A gente abre todo dia, das seis da tarde até meia-noite.",
+    "perguntar_atendente": "Eu sou o Rafael, atendente virtual da Bella Napoli.",
 }
 
 
@@ -223,18 +226,21 @@ def proximo_objetivo(pedido: Pedido) -> str:
     return f"Deixa eu confirmar: {itens}, dá {total} reais, pra entregar na {pedido.endereco}. Tá certinho?"
 
 
-def nao_entendi(pedido: Pedido) -> str:
-    """Não entendeu a pizza: mantém o que já sabe e oferece as opções do que falta."""
+def nao_entendi(pedido: Pedido) -> tuple[str, bool]:
+    """Não entendeu a pizza: mantém o que já sabe, pergunta só o que falta e, na terceira, passa a um atendente."""
     pedido.erros += 1
     incompleta = next((p for p in pedido.pizzas if not p.tamanho or not p.sabores), None)
-    sabores = ", ".join(SABORES)
+    if pedido.erros >= 3:
+        return "Tô com dificuldade pra entender. Vou te passar pra um atendente, tá? Só um momento.", True
     if incompleta and not incompleta.tamanho:
-        return "Desculpa, não peguei o tamanho. Pode ser pequena, média, grande ou família."
+        return "Desculpa, não peguei o tamanho. Pequena, média, grande ou família?", False
+    if incompleta and pedido.erros == 1:
+        return f"Desculpa, não peguei o sabor. Tem {', '.join(SABORES)}. Qual vai ser?", False
     if incompleta:
-        return f"Desculpa, esse sabor eu não entendi. Tem {sabores}. Qual vai ser?"
+        return "Pode falar só o sabor, devagar? Por exemplo: calabresa.", False
     if pedido.erros == 1:
-        return "Desculpa, não entendi a pizza. Me fala o tamanho e o sabor, tipo: uma grande de calabresa."
-    return f"Os sabores são {sabores}, nos tamanhos pequena, média, grande e família. Qual vai ser?"
+        return "Desculpa, não entendi a pizza. Me fala o tamanho e o sabor, tipo: uma grande de calabresa.", False
+    return "Pode falar devagar? Primeiro o tamanho, depois o sabor.", False
 
 
 async def responder_com_ia(texto: str, pedido: Pedido) -> str | None:
@@ -248,7 +254,7 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
     """O que dizer a esta fala, e se a ligação termina depois dela."""
     intencao = decisao.business_intent()  # "other" quando a escolha não é segura
     resposta = RESPOSTAS.get(intencao, "")  # dúvida: responde e volta ao objetivo
-    pizzas = ler_pizzas(texto)
+    pizzas = [] if intencao.startswith("perguntar_") else ler_pizzas(texto)  # uma pergunta não é pedido
     # "Meu nome é Lucas" mais tarde: o nome foi mal entendido antes; corrige e segue
     nome_corrigido = primeiro_nome(decisao.extracted.get("name") or "")
     if pedido.etapa != "nome" and nome_corrigido and decisao.intent.startswith("name_") and not pizzas:
@@ -325,7 +331,7 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
             pedido.etapa = "endereco"
             return proximo_objetivo(pedido), False
         if not resposta:
-            return nao_entendi(pedido), False  # guarda o que entendeu e pergunta só o que falta
+            return nao_entendi(pedido)  # guarda o que entendeu e pergunta só o que falta
 
     elif pedido.etapa == "endereco" and not resposta:
         # O valor pedido com expect_slot: a mesma fala lida pelo reconhecimento preciso, em segundo plano
@@ -375,12 +381,27 @@ async def conduzir(call: Call) -> None:
             if event.unclear:  # fala confusa: pede para repetir em vez de agir num palpite
                 confusas += 1
                 encerrando = confusas >= 3
-                await call.speak(DESISTIR if encerrando else REPETIR, allow_barge_in=not encerrando)
+                if encerrando:
+                    await call.speak(DESISTIR, allow_barge_in=False)
+                elif confusas == 2:  # duas seguidas: volta ao assunto em vez de repetir de novo
+                    await call.speak(f"Vamos voltar {ASSUNTO}? {proximo_objetivo(pedido)}")
+                else:
+                    await call.speak(REPETIR)
+                if not encerrando and pedido.etapa in ("pizzas", "mais"):
+                    await call.expect_precise()
                 continue
             confusas = 0
+            if event.drifting:  # o cliente divagou: reconhece e volta à pergunta em que estava
+                await call.speak(f"Tá bom! Voltando {ASSUNTO}: {proximo_objetivo(pedido)}")
+                if pedido.etapa in ("pizzas", "mais"):
+                    await call.expect_precise()
+                continue
             resposta, fim = await responder(call, pedido, falas.get(event.utterance_id or "", ""), event)
             encerrando = fim
             await call.speak(resposta, allow_barge_in=not fim)
+            if not fim and pedido.etapa in ("pizzas", "mais"):
+                # Sabor e tamanho em uma ou duas palavras: a resposta sai do reconhecimento preciso
+                await call.expect_precise()
             if pedido.etapa == "endereco" and pedido.esperado is None:
                 # A próxima resposta é o endereço: o Ermis Voice lê com o reconhecimento preciso
                 pedido.esperado = await call.expect_slot("endereco", "address", description="rua, número e bairro")

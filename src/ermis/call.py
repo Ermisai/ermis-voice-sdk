@@ -7,14 +7,25 @@ import contextlib
 import json
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
 from .errors import ConnectionClosedError, ErmisError, InvalidRequestError, from_close_code
-from .events import Audio, BargeIn, Decision, ErrorEvent, Event, SessionEnded, SlotResult, SpeakDone, parse_event
+from .events import (
+    Audio,
+    BargeIn,
+    Decision,
+    ErrorEvent,
+    Event,
+    SessionEnded,
+    SlotResult,
+    SpeakDone,
+    Transcript,
+    parse_event,
+)
 from .speech_text import normalize_for_speech
 
 
@@ -57,6 +68,7 @@ class Call:
         self._events: asyncio.Queue[Any] = asyncio.Queue()
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._speaking: dict[str, asyncio.Future[bool]] = {}
+        self._texts: dict[str, str] = {}  # texto de cada fala, para Decision.text
         self._reader: asyncio.Task[None] | None = None
         self.session_id: str | None = None
         self.ended: SessionEnded | None = None
@@ -102,6 +114,11 @@ class Call:
                     self._events.put_nowait(Audio("audio", {}, data=raw))
                     continue
                 event = parse_event(json.loads(raw))
+                if isinstance(event, Transcript):
+                    self._texts[event.utterance_id] = event.text
+                elif isinstance(event, Decision) and event.utterance_id and not event.text:
+                    # A Decision chega sem o texto; o Call junta o da Transcript da mesma fala
+                    event = replace(event, text=self._texts.get(event.utterance_id, ""))
                 if self._route(event):
                     continue
                 self._events.put_nowait(event)
@@ -268,6 +285,15 @@ class Call:
     async def playback_finished(self, speak_id: str) -> None:
         """Avisa que o áudio de ``speak_id`` terminou de tocar do seu lado. Só no transporte ``websocket``."""
         await self.send({"type": "playback_finished", "id": speak_id})
+
+    async def expect_precise(self) -> None:
+        """A próxima resposta precisa ser exata (um item do cardápio, um tamanho, uma quantidade).
+
+        A ``Transcript`` e a ``Decision`` dessa fala saem do reconhecimento de maior precisão: leva alguns
+        décimos de segundo a mais, só nessa fala. Chame logo depois do ``speak`` da pergunta. Para um dado
+        que pode chegar depois (endereço, e-mail), prefira ``expect_slot()``, que não atrasa a conversa.
+        """
+        await self.send({"type": "expect_precise"})
 
     async def expect_slot(
         self, name: str, type: str = "text", *, description: str | None = None

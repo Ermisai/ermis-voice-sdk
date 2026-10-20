@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from xml.etree import ElementTree
 
 import httpx
@@ -495,3 +496,62 @@ def test_decision_tells_unclear_and_off_topic_speech():
     assert off.off_topic and not off.unclear
     sure = decision(intent="complex", action="escalate", custom_intent="pedir", custom_intent_confidence=1.0)
     assert sure.business_intent() == "pedir" and not sure.off_topic
+
+
+def test_decision_tells_drifting_speech():
+    def decision(text, **fields):
+        return replace(parse_event({"type": "decision", "utterance_id": "u1", **fields}), text=text)
+
+    # From a real call: a long sentence read as a name, with no business intent
+    long_name = decision(
+        "cálcio nome oi brasileira vinte e oito e vinte e nove não é com vinte e sete gente vai está aqui",
+        intent="name_provide",
+        action="clarify",
+        custom_intent="other",
+        custom_intent_confidence=0.48,
+    )
+    assert long_name.drifting and not long_name.unclear and not long_name.off_topic
+    # A short name is a name; a clear question is off topic, not drifting
+    assert not decision("lucas", intent="name_provide", action="respond", custom_intent="other").drifting
+    question = decision(
+        "qual foi o resultado do jogo do flamengo ontem à noite lá no maracanã",
+        intent="question_service",
+        action="escalate",
+        custom_intent="other",
+        custom_intent_confidence=1.0,
+    )
+    assert question.off_topic and not question.drifting
+    # A long order with a sure business intent is not a detour
+    order = decision(
+        "eu quero uma grande de calabresa e uma média meio frango meio portuguesa por favor",
+        intent="complex",
+        action="escalate",
+        custom_intent="pedir_pizza",
+        custom_intent_confidence=1.0,
+    )
+    assert not order.drifting
+
+
+async def test_decision_carries_the_text_and_expect_precise_is_sent():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        received.append(json.loads(await ws.recv()))
+        await ws.send(json.dumps({"type": "transcript", "utterance_id": "u1", "text": "chocolate", "assessment": {}}))
+        await ws.send(json.dumps({"type": "decision", "utterance_id": "u1", "intent": "complex", "action": "escalate"}))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        decisions = []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    await call.expect_precise()
+                elif isinstance(event, Decision):
+                    decisions.append(event)
+        return decisions
+
+    decisions = await _with_server(handler, body)
+    assert received == [{"type": "expect_precise"}]
+    assert decisions[0].text == "chocolate"

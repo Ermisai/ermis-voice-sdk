@@ -84,6 +84,9 @@ Ligação (`Call`):
   próxima resposta do cliente traz um dado importante (endereço, e-mail, CPF, telefone). A Ermis lê essa
   resposta também com o reconhecimento de maior precisão, em segundo plano. Chame logo depois do `speak`
   da pergunta; na `Decision` da resposta, `resultado = await futuro` (`.found`, `.value`).
+- `await call.expect_precise()` avisa que a próxima resposta precisa ser exata (um item do cardápio, um tamanho,
+  uma quantidade ditos em uma ou duas palavras): a `Transcript` e a `Decision` dela saem do reconhecimento de
+  maior precisão (alguns décimos de segundo a mais, só nessa fala). Chame logo depois do `speak` da pergunta.
 - `await call.set_custom_intents([...])` troca as intenções das próximas decisões (por exemplo, as opções de
   horário de uma etapa); `await call.set_vocabulary([...])` troca o vocabulário.
 - `await call.decide(text, *, custom_intents=[CustomIntent(key, label, description), ...]) -> Decision`
@@ -107,12 +110,13 @@ Eventos (todos têm `.type` e `.raw`, o JSON original):
 - `Decision(intent, action, is_escape, complexity, custom_intent, extracted, utterance_id, id,
   custom_intent_confidence)`: o que o cliente quer. Use `decision.business_intent()` (a minha intenção, ou
   `"other"` quando a escolha não é segura), `decision.unclear` (fala confusa: peça para repetir) e
-  `decision.off_topic` (assunto fora do meu negócio). Chega logo depois do `Transcript` da mesma `utterance_id` e só para falas aproveitáveis.
+  `decision.off_topic` (assunto fora do meu negócio), `decision.drifting` (o cliente divagou: fala longa sem
+  nada do meu negócio) e `decision.text` (o que o cliente disse, preenchido pelo SDK). Chega logo depois do `Transcript` da mesma `utterance_id` e só para falas aproveitáveis.
   `intent`: `greeting`, `name_provide`, `name_correction`, `confirm_yes`, `confirm_no`, `farewell`,
   `thanks`, `wait`, `repeat`, `unclear`, `question_product`, `question_service`, `complaint`,
   `request_human`, `complex`. `action`: `respond` (frase pronta resolve), `escalate` (precisa de IA ou de
   pessoa), `clarify` (peça para repetir). `is_escape`: o cliente quer desligar ou falar com uma pessoa.
-  `Decision` NÃO tem o texto da fala: guarde `Transcript.text` por `utterance_id`.
+  O texto da fala vem em `decision.text`.
 - `TranscriptRevised(utterance_id, text, previous)`: a leitura precisa de uma resposta pedida com
   `expect_slot` mudou o texto (só informativo; o valor vem no `SlotResult`).
 - `SpeakStarted(id, chars)`, `SpeakDone(id, chars)`: início e fim de uma fala do agente.
@@ -146,7 +150,10 @@ As regras do meu negócio (seção 1) têm prioridade sobre as regras abaixo.
    em `custom_intents` na sessão e use `decision.business_intent()` em vez de `intent`: "minha internet caiu"
    pode chegar como `intent == "complaint"` e ainda assim ser algo que o agente resolve. Use
    `decision.off_topic` só depois de tentar ler o que a etapa precisa (uma resposta como "sexta-feira" também
-   chega sem intenção do negócio): aí diga em uma frase o que o agente resolve e repita a pergunta. Passe
+   chega sem intenção do negócio): aí diga em uma frase o que o agente resolve e repita a pergunta. Com
+   `decision.drifting` (o cliente divagou), reconheça em poucas palavras ("Tá bom!") e volte à pergunta em que
+   estava. Para respostas que precisam ser exatas (um sabor, um tamanho), `expect_precise()` logo depois da
+   pergunta. Passe
    em `vocabulary` as palavras do negócio que o reconhecimento pode errar (nomes de produtos, sabores,
    serviços). Para dados ditados importantes (endereço, e-mail, CPF, telefone), `expect_slot` logo depois
    da pergunta; para os outros, `extract_slot`.

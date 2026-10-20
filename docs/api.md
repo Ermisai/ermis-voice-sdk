@@ -171,6 +171,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `{"type": "decide", "id": "d1", "text": "…", "custom_intents": […]}` | Pede uma decisão, com intenções suas ([ver abaixo](#intenções-customizadas)) |
 | `{"type": "extract_slot", "id": "s1", "text": "…", "slot": {"name": "email", "type": "email"}}` | Extrai um dado da fala |
 | `{"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address"}}` | A próxima resposta do cliente traz esse dado. A Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, e manda o `slot` com o valor (ver [Dados importantes](#dados-importantes-endereço-e-mail-documentos)) |
+| `{"type": "expect_precise"}` | A próxima resposta precisa ser exata (um item do cardápio, um tamanho, uma quantidade): a `transcript` e a `decision` dela saem do reconhecimento de maior precisão. Leva um pouco mais (a espera por essa leitura), só nessa fala ([ver abaixo](#dados-importantes-endereço-e-mail-documentos)) |
 | `{"type": "set_custom_intents", "custom_intents": […]}` | Troca as intenções suas avaliadas nas próximas decisões automáticas (por exemplo, a cada etapa da conversa); `[]` desliga |
 | `{"type": "set_vocabulary", "vocabulary": […]}` | Troca o vocabulário das próximas falas; `[]` desliga |
 | `{"type": "thinking", "message": "…", "timeout_ms": 45000}` | A resposta vai demorar: o agente fala `message` agora e espera até `timeout_ms` neste turno ([ver abaixo](#avisar-que-vai-demorar-thinking)) |
@@ -230,6 +231,8 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 
 
 
+**`expect_slot` ou `expect_precise`?** Use `expect_slot` quando o que você precisa é o dado (endereço, e-mail, CPF): a conversa não espera e o valor chega depois. Use `expect_precise` quando a resposta inteira precisa estar certa para você decidir o que fazer, como um sabor ou um tamanho ditos em uma ou duas palavras ("chocolate", "uma pequena"): a `transcript` e a `decision` dessa fala já saem da leitura de maior precisão, ao custo de alguns décimos de segundo nessa fala. Envie logo depois da pergunta; vale só para a próxima resposta. No SDK: `await call.expect_precise()`.
+
 No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
 
@@ -253,7 +256,9 @@ No SDK: `sessions.create(vocabulary=[...])` e `call.set_vocabulary([...])`; `Tra
 - **Fala confusa** (transcrição ruim, frase sem sentido): a `decision` vem com `action` igual a `clarify`. Peça para repetir quando, além disso, a fala não trouxer nenhuma intenção sua com segurança (`custom_intent` `other` ou `custom_intent_confidence` abaixo de 0,8). Respostas curtas e válidas ("grande", "não, só isso") também podem vir com `clarify`, por isso olhe as duas coisas.
 - **Fora do assunto** ("vocês vendem celular?", "vai chover amanhã?"): `custom_intent` vem `other` com confiança alta e `action` diferente de `clarify`. Diga educadamente o que o agente faz e volte à pergunta em que estava.
 
-No SDK, a `Decision` já faz essa leitura: `decision.unclear`, `decision.off_topic` e `decision.business_intent()`.
+- **Divagação** (o cliente fala bastante sobre outra coisa, sem nada do seu negócio): reconheça em poucas palavras e volte à pergunta em que estava ("Tá bom! Voltando ao seu pedido: …").
+
+No SDK, a `Decision` já faz essa leitura: `decision.unclear`, `decision.off_topic`, `decision.drifting` (divagação) e `decision.business_intent()`; `decision.text` traz o que o cliente disse.
 
 ### Dados importantes: endereço, e-mail, documentos
 

@@ -167,6 +167,8 @@ waiting = WaitingOptions(
 
 A transcrição rápida erra mais em dados ditados. Avise antes que a próxima resposta traz o dado: a Ermis lê essa fala também com o reconhecimento de maior precisão, em segundo plano, sem atrasar a conversa.
 
+Para uma resposta que precisa ser exata e decide o próximo passo (um sabor, um tamanho), use `await call.expect_precise()` logo depois da pergunta: a `Transcript` e a `Decision` dessa fala já saem da leitura precisa, com alguns décimos de segundo a mais só nela.
+
 ```python
 await call.speak("Pra qual endereço eu mando?")
 endereco = await call.expect_slot("endereco", "address", description="rua, número e bairro")
