@@ -11,7 +11,7 @@ Use somente as classes e os métodos documentados nos links abaixo. A chave (`ER
 - [Tutorial do atendente](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md): Twilio ou navegador, nome e voz do agente, calibragem de ruído (`calibrate`, `NoiseCalibrated`), perfis de qualidade e latência, `guard`, respostas pré-definidas com `custom_intents` e a IA do cliente na camada 3
 - Tutoriais por cenário: [URA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ura.md), [agendamento](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/agendamento.md), [pedidos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/pedidos.md), [assistente com IA e ferramentas](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/assistente-ia.md), [ligação ativa](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ligacao-ativa.md)
 - [README e referência do SDK](https://github.com/Ermisai/ermis-voice-sdk/blob/main/README.md): `Ermis`, `Session`, `Call`, eventos, opções e exceções
-- [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, áudio e erros
+- [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, como ligar a sua IA (o roteiro decide, a IA escreve), áudio e erros
 - [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): prompt completo para gerar um agente com testes
 
 ## Exemplos

@@ -14,6 +14,7 @@ Tudo roda na Ermis: detecção de fala, transcrição, decisões e voz. Você pa
 - [Canal de controle (WebSocket)](#canal-de-controle-websocket)
 - [Decisões e extração de dados](#decisões-e-extração-de-dados)
 - [Enquanto a sua IA pensa](#enquanto-a-sua-ia-pensa)
+- [Conectando a sua IA](#conectando-a-sua-ia)
 - [Conectando o áudio](#conectando-o-áudio)
 - [Erros e limites](#erros-e-limites)
 - [Boas práticas](#boas-práticas)
@@ -300,7 +301,7 @@ Endereços, e-mails e números ditados são onde a transcrição rápida mais er
 {"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address", "description": "rua, número e bairro"}}
 ```
 
-Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta. Com prioridade de latência (`latency`, `local_first`, `local_only`), o `slot` sai na hora, do texto rápido; se a leitura de maior precisão achar outro valor, chega um segundo `slot` com `revised: true` (no SDK, `SlotResult.revised`).
+Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta. Com prioridade de latência (`latency`, `local_first`), a Ermis espera essa leitura só por um instante (até cerca de meio segundo, o tempo que ela costuma levar); se ela não chegar, o `slot` sai do texto rápido e, se a leitura de maior precisão achar outro valor, chega um segundo `slot` com `revised: true` (no SDK, `SlotResult.revised`). Com `local_only`, o `slot` sai sempre do texto rápido. Ao receber um `slot` revisado, corrija o dado; se o agente já o repetiu para o cliente, diga a correção.
 
 No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
@@ -410,6 +411,46 @@ Quando você sabe que um passo é lento (consulta a um sistema, geração de doc
 
 O agente fala `message` na hora, no lugar da frase de espera padrão, e espera até `timeout_ms` neste turno. As frases de paciência continuam. Os dois campos são opcionais, e você pode enviar `thinking` mais de uma vez no mesmo turno.
 
+## Conectando a sua IA
+
+A Ermis não escreve as falas do agente: ela ouve, transcreve, classifica e fala. O texto vem sempre do seu código, de um roteiro, da sua IA ou dos dois. Qualquer IA serve (um modelo de linguagem em nuvem, um modelo seu, regras): o SDK só precisa do texto pronto.
+
+Há dois jeitos comuns de ligar a sua IA a um roteiro (para um agente conduzido inteiramente pela IA, com ferramentas que consultam o seu sistema, veja o [tutorial do assistente com IA](tutoriais/assistente-ia.md)).
+
+**1. O roteiro conduz, a IA responde o que sai dele.** O roteiro faz as perguntas e guarda os dados; a IA responde só perguntas fora do roteiro e divagações. Crie a sessão com `off_topic` e `drift` vazios no `guard`: essas falas chegam ao seu código em vez de a Ermis responder com a frase pronta. Responda com a sua IA e repita a pergunta atual com `ask`.
+
+**2. O roteiro decide, a IA escreve.** O roteiro continua decidindo o que precisa ser dito (o próximo passo, os valores, a confirmação) e a sua IA transforma isso numa fala natural, respondendo antes ao que o cliente disse. O roteiro garante o fluxo e os dados; a IA cuida do jeito de falar. Na instrução da IA, peça para manter exatamente os valores do roteiro (preços, horários, nomes, e-mails) e para terminar com a pergunta do roteiro, quando houver.
+
+```python
+from ermis import Decision
+
+guard = {"enabled": True, "off_topic": "", "drift": ""}  # perguntas e divagações chegam ao seu código
+session = await ermis.sessions.create(transport="twilio", guard=guard)
+
+async def falar(call, fala_do_roteiro: str, pergunta: bool, historico: list[str]) -> None:
+    await call.thinking(timeout_ms=6000)  # a Ermis não encerra o turno enquanto a IA escreve
+    try:
+        texto = await asyncio.wait_for(sua_ia(historico, fala_do_roteiro), timeout=4)
+    except Exception:
+        texto = fala_do_roteiro  # a IA falhou ou demorou: a fala do roteiro
+    historico.append(f"Atendente: {texto}")
+    if pergunta:
+        await call.ask(texto)  # vira a pergunta atual: a Ermis a repete depois de um desvio
+    else:
+        await call.say(texto)
+
+# Na Decision:
+#   decision.off_topic ou decision.drifting  -> falar(call, pergunta_atual, True, historico)
+#   o resto                                  -> o roteiro decide a fala_do_roteiro e chama falar(...)
+```
+
+Cuidados:
+
+- **Latência:** cada fala passa pela sua IA. Prefira modelos rápidos e respostas curtas; as frases de espera (`waiting`) cobrem a demora, e `thinking` evita o tempo limite do turno.
+- **Dados:** use a IA para o texto, não para os dados. Endereço, e-mail e CPF continuam vindo do `slot`; preços e horários, do seu sistema.
+- **Fallback:** sem resposta da IA no tempo, use a fala do roteiro. A ligação nunca fica parada esperando a IA.
+- **Fim da ligação:** despedidas e pedidos de atendente (`is_escape`) não precisam da IA: responda com a frase pronta e encerre.
+
 ## Conectando o áudio
 
 ### Twilio (`transport: "twilio"`)
@@ -464,7 +505,7 @@ Os ajustes abaixo são campos da criação da sessão (`POST /v1/voice/sessions`
 
 | Ajuste | Efeito | Custo |
 |---|---|---|
-| `"transcription_priority": "latency"` | A transcrição sai assim que o reconhecimento rápido tem texto, sem esperar a leitura de maior qualidade (cerca de 150 ms a menos por fala) | Mais erros em nomes, números e frases longas |
+| `"transcription_priority": "latency"` | A transcrição sai assim que o reconhecimento rápido tem texto, sem esperar a leitura de maior qualidade (cerca de 150 ms a menos por fala). Nas respostas que você marcou como importantes (`precise`, `slot`), a Ermis ainda espera essa leitura por até cerca de meio segundo | Mais erros em nomes, números e frases longas |
 | `vad.min_silence_ms` entre `300` e `350` | O turno fecha mais cedo depois que o cliente para de falar | Clientes que fazem pausas no meio da frase são cortados |
 | Respostas prontas para `action: "respond"` | Cumprimentos, agradecimentos e despedidas sem passar pela sua IA | — |
 | Respostas curtas | Menos texto para sintetizar e para o cliente ouvir antes de poder responder | — |

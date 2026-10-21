@@ -2,7 +2,10 @@
 
 ## 0.3.0a1 (prévia)
 
-Requer a Ermis Voice API 0.3.0.
+Requer a Ermis Voice API 0.3.0 (0.3.1 para a espera curta pela leitura de maior precisão).
+
+- Documentação: [Conectando a sua IA](docs/api.md#conectando-a-sua-ia), com os dois jeitos de ligar a sua IA (o roteiro conduz e a IA responde os desvios; o roteiro decide e a IA escreve as falas), fallback para a fala do roteiro e `thinking` enquanto a IA escreve.
+- Com prioridade de latência, as respostas marcadas como importantes (`precise`, `slot`) esperam a leitura de maior precisão por até cerca de meio segundo (Ermis Voice API 0.3.1); o `slot` revisado (`SlotResult.revised`) fica para quando ela chega depois disso.
 
 - [Tutoriais](docs/tutoriais/README.md), um por cenário: [atendente](docs/tutoriais/atendente.md) (a configuração inteira: canal, identidade do agente, calibragem de ruído, qualidade e latência, mensagens de espera, as três camadas de resposta, encerramento e transferência), [URA](docs/tutoriais/ura.md), [agendamento](docs/tutoriais/agendamento.md), [pedidos](docs/tutoriais/pedidos.md), [assistente com IA](docs/tutoriais/assistente-ia.md) e [ligação ativa](docs/tutoriais/ligacao-ativa.md). Exemplos novos: `clinica.py`, `assistente_ia.py` (a IA conduz, com ferramentas) e `confirmacao.py` (o agente liga para o cliente).
 
