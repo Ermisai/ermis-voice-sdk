@@ -97,7 +97,7 @@ class Decision(Event):
     text: str = ""
     """O que o cliente disse (o ``Transcript`` da mesma fala; preenchido pelo ``Call``)."""
     answer: str | None = None
-    """``"yes"``, ``"no"`` ou ``None``: o sim/não da fala, com a sua intenção em primeiro lugar."""
+    """``"yes"``, ``"no"`` ou ``None``: o sim/não da fala como resposta à última pergunta do agente."""
     guidance: str | None = None
     """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"`` ou ``None``."""
     handled: bool = False
@@ -126,7 +126,8 @@ class Decision(Event):
         # "sim", "não, só isso", um nome: respostas curtas. Uma frase longa lida como nome é divagação
         if self.intent in ("name_provide", "name_correction"):
             return len(self.text.split()) <= 5 if self.text else True
-        return self.intent in _PLAIN_ANSWERS
+        # "Bom dia, tudo bem? Nossa, hoje tá um calor..." começa com um cumprimento, mas é divagação
+        return self.intent in _PLAIN_ANSWERS and (not self.text or len(self.text.split()) < 10)
 
     @property
     def unclear(self) -> bool:

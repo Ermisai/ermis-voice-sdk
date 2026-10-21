@@ -118,7 +118,7 @@ Eventos (todos têm `.type` e `.raw`, o JSON original):
   `"other"` quando a escolha não é segura), `decision.unclear` (fala confusa: peça para repetir) e
   `decision.off_topic` (assunto fora do meu negócio), `decision.drifting` (o cliente divagou: fala longa sem
   nada do meu negócio) e `decision.text` (o que o cliente disse, preenchido pelo SDK). `decision.answer`:
-  `"yes"`/`"no"`/`None`, o sim/não com a minha intenção em primeiro lugar (use no lugar de `intent ==
+  `"yes"`/`"no"`/`None`, o sim/não como resposta à última pergunta do agente (use no lugar de `intent ==
   "confirm_yes"`). `decision.handled`: com o `guard` da sessão, a Ermis já respondeu a fala (fala confusa,
   divagação, fora do tema); **não responda**. Chega logo depois do `Transcript` da mesma `utterance_id` e só para falas aproveitáveis.
   `intent`: `greeting`, `name_provide`, `name_correction`, `confirm_yes`, `confirm_no`, `farewell`,

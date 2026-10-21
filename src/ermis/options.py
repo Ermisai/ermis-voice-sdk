@@ -94,6 +94,7 @@ def session_body(
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
     vocabulary: list[str] = UNSET,
+    guard: dict[str, Any] = UNSET,
     vad: VadOptions | dict[str, Any] = UNSET,
     barge_in: BargeInOptions | dict[str, Any] = UNSET,
     waiting: WaitingOptions | dict[str, Any] = UNSET,
@@ -114,6 +115,7 @@ def session_body(
         if custom_intents is UNSET
         else [i if isinstance(i, dict) else asdict(i) for i in custom_intents],
         "vocabulary": vocabulary,
+        "guard": guard,
         "vad": vad,
         "barge_in": barge_in,
         "waiting": waiting,

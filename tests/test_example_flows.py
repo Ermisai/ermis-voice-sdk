@@ -211,3 +211,20 @@ async def test_pizzeria_takes_an_order_with_the_address_read_by_the_precise_reco
     assert said[-1].startswith("Prontinho, pedido feito!")
     session = exemplo.INTENCOES and exemplo.VOCABULARIO
     assert "margherita" in session
+
+
+def test_examples_only_pass_options_the_sdk_accepts():
+    """Every keyword the examples give to ``sessions.create`` exists in it (a typo or a missing option
+    would only fail when a customer runs the example)."""
+    import ast
+    import inspect
+
+    from ermis.client import _Sessions
+
+    accepted = set(inspect.signature(_Sessions.create).parameters) - {"self"}
+    used: set[str] = set()
+    for path in Path(__file__).resolve().parents[1].glob("examples/*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "create":
+                used |= {k.arg for k in node.keywords if k.arg}
+    assert used and used <= accepted, used - accepted

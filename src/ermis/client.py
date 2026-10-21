@@ -99,6 +99,7 @@ class _Sessions:
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
         vocabulary: list[str] = UNSET,
+        guard: dict[str, Any] = UNSET,
         vad: VadOptions | dict[str, Any] = UNSET,
         barge_in: BargeInOptions | dict[str, Any] = UNSET,
         waiting: WaitingOptions | dict[str, Any] = UNSET,
@@ -112,6 +113,12 @@ class _Sessions:
 
         ``vocabulary`` (lista de palavras): termos do seu negócio (sabores, serviços, produtos). Quando a
         transcrição sai parecida com um deles pelo som ("marquerita"), o texto já chega corrigido.
+
+        ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
+        frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
+        ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
+        ``off_topic`` vazio: as perguntas fora do tema chegam ao seu código (por exemplo, para a sua IA).
+        As decisões que a Ermis já respondeu chegam com ``handled``.
         """
         body = session_body(
             transport=transport,
@@ -124,6 +131,7 @@ class _Sessions:
             early_turn=early_turn,
             custom_intents=custom_intents,
             vocabulary=vocabulary,
+            guard=guard,
             vad=vad,
             barge_in=barge_in,
             waiting=waiting,

@@ -229,7 +229,7 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
 | `custom_intent_confidence` | De 0 a 1: quanto a escolha de `custom_intent` é segura. Frases truncadas ou fora do assunto que ainda caem numa intenção sua vêm baixas (abaixo de 0,8): trate como `other` |
-| `answer` | `yes`, `no` ou `null`: o sim/não da fala, com a sua intenção em primeiro lugar ("eu não quero calabresa, quero quatro queijos" é mudança de pedido, não um "não") |
+| `answer` | `yes`, `no` ou `null`: o sim/não da fala como resposta à última pergunta do agente ("já reiniciei e nada" para "já tentou reiniciar o modem?" é `yes`; "eu não quero calabresa, quero quatro queijos" é mudança de pedido, não um "não") |
 | `guidance` | `unclear` (fala confusa), `drifting` (divagação), `off_topic` (pergunta fora do seu negócio) ou `null` (uma resposta para o seu roteiro) |
 | `handled` / `guided_text` | Com o `guard`: `true` quando a Ermis já respondeu a fala (o que ela disse vem em `guided_text`); o seu agente não responde |
 | `choice` / `choice_confidence` | Com `ask` e `choices`: a resposta esperada que o cliente quis dizer (ou `none`) e o quanto a escolha é segura (use a partir de 0,8) |

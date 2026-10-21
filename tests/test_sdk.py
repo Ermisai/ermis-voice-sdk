@@ -92,6 +92,7 @@ async def test_session_turn_options_and_custom_intents():
         early_turn={"speculate": True, "close_on_complete_text": True},
         custom_intents=[CustomIntent("pedir_pizza", "Pede pizza", "tamanho e sabor"), {"key": "outro_assunto"}],
         vocabulary=["margherita", "calabresa"],
+        guard={"enabled": True, "off_topic": ""},
     )
     assert seen[0] == {
         "transcription_priority": "local_first",
@@ -102,6 +103,7 @@ async def test_session_turn_options_and_custom_intents():
             {"key": "outro_assunto"},
         ],
         "vocabulary": ["margherita", "calabresa"],
+        "guard": {"enabled": True, "off_topic": ""},
     }
 
 

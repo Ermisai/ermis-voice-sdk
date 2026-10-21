@@ -197,7 +197,7 @@ elif isinstance(event, Decision):
     if event.handled:                 # a Ermis já respondeu (fala confusa, divagação, fora do tema)
         continue
     sabor = event.chosen()            # "chocolate", mesmo com "aquela doce" ou "pit sapequena dissocolate"
-    if event.answer == "no": ...      # sim/não com a sua intenção em primeiro lugar
+    if event.answer == "no": ...      # sim/não à pergunta que o agente fez
 ```
 
 Fala confusa: a Ermis pede para repetir, na segunda volta à pergunta atual e na terceira se despede. Divagação e assunto fora do tema: a frase do negócio e a pergunta atual de novo.
