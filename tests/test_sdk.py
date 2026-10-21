@@ -555,3 +555,70 @@ async def test_decision_carries_the_text_and_expect_precise_is_sent():
     decisions = await _with_server(handler, body)
     assert received == [{"type": "expect_precise"}]
     assert decisions[0].text == "chocolate"
+
+
+async def test_ask_sends_the_question_with_its_expectations_and_decisions_bring_the_engine_reading():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        ask = json.loads(await ws.recv())
+        received.append(ask)
+        await ws.send(json.dumps({"type": "transcript", "utterance_id": "u1", "text": "aquela doce", "assessment": {}}))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "decision",
+                    "utterance_id": "u1",
+                    "intent": "complex",
+                    "action": "escalate",
+                    "custom_intent": "pedir_pizza",
+                    "choice": "chocolate",
+                    "choice_confidence": 0.8,
+                    "answer": None,
+                    "guidance": None,
+                    "handled": False,
+                }
+            )
+        )
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "decision",
+                    "utterance_id": "u2",
+                    "intent": "unclear",
+                    "action": "clarify",
+                    "guidance": "unclear",
+                    "handled": True,
+                    "guided_text": "Pode repetir?",
+                }
+            )
+        )
+        await ws.send(json.dumps({"type": "slot", "id": ask["id"], "value": "Rua X, 10", "status": "found"}))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        decisions, values = [], []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    question = await call.ask(
+                        "De qual sabor? Custa R$ 49",
+                        choices=[CustomIntent("chocolate", "chocolate", "a pizza doce")],
+                        precise=True,
+                        slot=("endereco", "address"),
+                    )
+                elif isinstance(event, Decision):
+                    decisions.append(event)
+            values.append(await question.value)
+        return decisions, values
+
+    decisions, values = await _with_server(handler, body)
+    ask = received[0]
+    assert ask["type"] == "ask" and ask["text"] == "De qual sabor? Custa quarenta e nove reais"
+    assert ask["precise"] is True and ask["choices"][0]["key"] == "chocolate"
+    assert ask["slot"] == {"name": "endereco", "type": "address"}
+    first, second = decisions
+    assert first.chosen() == "chocolate" and first.text == "aquela doce" and not first.handled
+    assert second.handled and second.unclear and second.guided_text == "Pode repetir?"
+    assert values[0].value == "Rua X, 10"

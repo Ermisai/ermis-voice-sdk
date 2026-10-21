@@ -94,6 +94,23 @@ class Decision(Event):
     """De 0 a 1: quanto a escolha de ``custom_intent`` é segura. Abaixo de 0,8 é um palpite (frase confusa)."""
     text: str = ""
     """O que o cliente disse (o ``Transcript`` da mesma fala; preenchido pelo ``Call``)."""
+    answer: str | None = None
+    """``"yes"``, ``"no"`` ou ``None``: o sim/não da fala, com a sua intenção em primeiro lugar."""
+    guidance: str | None = None
+    """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"`` ou ``None``."""
+    handled: bool = False
+    """Com o ``guard`` da sessão: a Ermis já respondeu esta fala (``guided_text``). Não responda."""
+    guided_text: str | None = None
+    choice: str | None = None
+    """Com ``ask(..., choices=...)``: a resposta esperada que o cliente quis dizer, ou ``"none"``."""
+    choice_confidence: float | None = None
+
+    def chosen(self, min_confidence: float = 0.8) -> str | None:
+        """A resposta esperada escolhida, quando a escolha é segura; ``None`` quando não é."""
+        if not self.choice or self.choice == "none":
+            return None
+        confidence = 1.0 if self.choice_confidence is None else self.choice_confidence
+        return self.choice if confidence >= min_confidence else None
 
     def business_intent(self, min_confidence: float = 0.8) -> str:
         """A sua intenção (``custom_intent``), ou ``"other"`` quando a escolha não é segura."""
@@ -111,6 +128,12 @@ class Decision(Event):
 
     @property
     def unclear(self) -> bool:
+        if "guidance" in self.raw:
+            return self.guidance == "unclear"
+        return self._local_unclear
+
+    @property
+    def _local_unclear(self) -> bool:
         """Fala confusa (transcrição ruim, frase sem sentido): peça para repetir em vez de agir num palpite.
 
         A Ermis pediu esclarecimento (``action == "clarify"``) e nenhuma intenção sua veio segura. Respostas
@@ -121,11 +144,17 @@ class Decision(Event):
             and not self.is_escape
             and self.business_intent() == "other"
             and not self._plain_answer
-            and not self.drifting
+            and not self._local_drifting
         )
 
     @property
     def off_topic(self) -> bool:
+        if "guidance" in self.raw:
+            return self.guidance == "off_topic"
+        return self._local_off_topic
+
+    @property
+    def _local_off_topic(self) -> bool:
         """Uma pergunta ou pedido claro sobre algo que não é do seu negócio ("vocês vendem celular?").
 
         Use depois de tentar ler o que a etapa espera: respostas de dados ("sexta-feira", "Rua 7") também
@@ -141,6 +170,12 @@ class Decision(Event):
 
     @property
     def drifting(self) -> bool:
+        if "guidance" in self.raw:
+            return self.guidance == "drifting"
+        return self._local_drifting
+
+    @property
+    def _local_drifting(self) -> bool:
         """O cliente está divagando: uma fala longa (10 palavras ou mais) sem nada do seu negócio.
 
         Reconheça em poucas palavras e volte à pergunta em que estava ("Tá bom! Voltando ao seu pedido: ...").
@@ -304,6 +339,12 @@ def parse_event(msg: dict[str, Any]) -> Event:
             utterance_id=g("utterance_id"),
             id=g("id"),
             custom_intent_confidence=g("custom_intent_confidence"),
+            answer=g("answer"),
+            guidance=g("guidance"),
+            handled=bool(g("handled")),
+            guided_text=g("guided_text"),
+            choice=g("choice"),
+            choice_confidence=g("choice_confidence"),
         )
     if t == "slot":
         return SlotResult(t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"))

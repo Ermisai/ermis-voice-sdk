@@ -45,6 +45,16 @@ def _new_id(prefix: str) -> str:
 _END = object()
 
 
+@dataclass(frozen=True)
+class Question:
+    """Uma pergunta feita com ``Call.ask()``."""
+
+    id: str
+    text: str
+    value: asyncio.Future[SlotResult] | None = None
+    """Com ``slot``: o valor da resposta (``await question.value``)."""
+
+
 class Call:
     """Uma ligação em andamento, vista pelo seu backend.
 
@@ -285,6 +295,45 @@ class Call:
     async def playback_finished(self, speak_id: str) -> None:
         """Avisa que o áudio de ``speak_id`` terminou de tocar do seu lado. Só no transporte ``websocket``."""
         await self.send({"type": "playback_finished", "id": speak_id})
+
+    async def ask(
+        self,
+        text: str,
+        *,
+        choices: list[CustomIntent | dict[str, Any]] | None = None,
+        precise: bool = False,
+        slot: tuple[str, str] | dict[str, Any] | None = None,
+        **options: Any,
+    ) -> Question:
+        """Faz uma pergunta: fala ``text`` e ela vira a pergunta atual da ligação.
+
+        Com o ``guard`` da sessão, a Ermis repete essa pergunta depois de uma fala confusa, de uma divagação
+        ou de um assunto fora do tema. ``choices``: as respostas esperadas (``CustomIntent(key, label,
+        description)``); a ``Decision`` da resposta traz ``choice``, mesmo com a fala mal transcrita ou dita
+        de outro jeito. ``precise``: a resposta sai do reconhecimento de maior precisão. ``slot``: o dado da
+        resposta, como em ``expect_slot`` (``("endereco", "address")``); o valor chega em ``Question.value``.
+        """
+        if self.ended is not None:
+            raise ConnectionClosedError("a sessão já terminou")
+        if self.normalize_text if options.pop("normalize", None) is None else options["normalize"]:
+            text = normalize_for_speech(text)
+        ask_id = options.pop("id", None) or _new_id("q")
+        msg: dict[str, Any] = {"type": "ask", "id": ask_id, "text": text}
+        for key, value in options.items():
+            if value is not None:
+                msg[key] = value
+        if choices:
+            msg["choices"] = [asdict(c) if isinstance(c, CustomIntent) else c for c in choices]
+        if precise:
+            msg["precise"] = True
+        value: asyncio.Future[SlotResult] | None = None
+        if slot:
+            name, kind = (slot["name"], slot.get("type", "text")) if isinstance(slot, dict) else slot
+            msg["slot"] = {**(slot if isinstance(slot, dict) else {}), "name": name, "type": kind}
+            value = asyncio.get_running_loop().create_future()
+            self._pending[ask_id] = value  # the slot of the answer comes with the id of the question
+        await self.send(msg)
+        return Question(ask_id, text, value)
 
     async def expect_precise(self) -> None:
         """A próxima resposta precisa ser exata (um item do cardápio, um tamanho, uma quantidade).

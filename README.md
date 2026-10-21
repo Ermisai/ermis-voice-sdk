@@ -179,6 +179,29 @@ elif isinstance(event, Decision):          # a decisão da resposta chega no rit
         await call.speak(f"Anotado: {resultado.value}. Tá certo?")
 ```
 
+### Fluxo da conversa: o roteiro pergunta, a Ermis conduz
+
+O seu código guarda as perguntas e as respostas do negócio; a Ermis decide o que acontece entre elas. Pergunte com `ask` (a pergunta vira a pergunta atual, com as respostas esperadas) e ligue o `guard` na sessão com as frases do seu negócio:
+
+```python
+session = await ermis.sessions.create(
+    transport="twilio",
+    guard={"enabled": True, "steer": "Vamos voltar ao seu pedido?", "drift": "Tá bom! Voltando ao seu pedido:",
+           "off_topic": "Isso eu não sei te dizer, aqui eu cuido dos pedidos."},
+)
+...
+await call.ask("De qual sabor?", precise=True, choices=[CustomIntent("calabresa", "calabresa"),
+                                                         CustomIntent("chocolate", "chocolate", "a pizza doce")])
+...
+elif isinstance(event, Decision):
+    if event.handled:                 # a Ermis já respondeu (fala confusa, divagação, fora do tema)
+        continue
+    sabor = event.chosen()            # "chocolate", mesmo com "aquela doce" ou "pit sapequena dissocolate"
+    if event.answer == "no": ...      # sim/não com a sua intenção em primeiro lugar
+```
+
+Fala confusa: a Ermis pede para repetir, na segunda volta à pergunta atual e na terceira se despede. Divagação e assunto fora do tema: a frase do negócio e a pergunta atual de novo.
+
 ### Voz natural
 
 Toda fala do agente passa por `normalize_for_speech()` antes de ir para a voz, então você pode escrever como escreveria numa tela:

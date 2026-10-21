@@ -84,6 +84,12 @@ Ligação (`Call`):
   próxima resposta do cliente traz um dado importante (endereço, e-mail, CPF, telefone). A Ermis lê essa
   resposta também com o reconhecimento de maior precisão, em segundo plano. Chame logo depois do `speak`
   da pergunta; na `Decision` da resposta, `resultado = await futuro` (`.found`, `.value`).
+- `await call.ask(text, *, choices=[CustomIntent(key, label, description), ...], precise=False, slot=None) -> Question`
+  faz uma pergunta: fala `text` e ela vira a pergunta atual (o `guard` a repete depois de um desvio).
+  `choices`: as respostas esperadas; a `Decision` da resposta traz `decision.chosen()` (a `key`, ou `None` se a
+  escolha não for segura), mesmo com a fala mal transcrita ou dita de outro jeito. `precise=True` para respostas
+  curtas que precisam ser exatas. `slot=("endereco", "address")`: o valor vem em `await question.value`.
+  **Faça toda pergunta com `ask`**, e use `speak` só para frases que não são perguntas.
 - `await call.expect_precise()` avisa que a próxima resposta precisa ser exata (um item do cardápio, um tamanho,
   uma quantidade ditos em uma ou duas palavras): a `Transcript` e a `Decision` dela saem do reconhecimento de
   maior precisão (alguns décimos de segundo a mais, só nessa fala). Chame logo depois do `speak` da pergunta.
@@ -111,7 +117,10 @@ Eventos (todos têm `.type` e `.raw`, o JSON original):
   custom_intent_confidence)`: o que o cliente quer. Use `decision.business_intent()` (a minha intenção, ou
   `"other"` quando a escolha não é segura), `decision.unclear` (fala confusa: peça para repetir) e
   `decision.off_topic` (assunto fora do meu negócio), `decision.drifting` (o cliente divagou: fala longa sem
-  nada do meu negócio) e `decision.text` (o que o cliente disse, preenchido pelo SDK). Chega logo depois do `Transcript` da mesma `utterance_id` e só para falas aproveitáveis.
+  nada do meu negócio) e `decision.text` (o que o cliente disse, preenchido pelo SDK). `decision.answer`:
+  `"yes"`/`"no"`/`None`, o sim/não com a minha intenção em primeiro lugar (use no lugar de `intent ==
+  "confirm_yes"`). `decision.handled`: com o `guard` da sessão, a Ermis já respondeu a fala (fala confusa,
+  divagação, fora do tema); **não responda**. Chega logo depois do `Transcript` da mesma `utterance_id` e só para falas aproveitáveis.
   `intent`: `greeting`, `name_provide`, `name_correction`, `confirm_yes`, `confirm_no`, `farewell`,
   `thanks`, `wait`, `repeat`, `unclear`, `question_product`, `question_service`, `complaint`,
   `request_human`, `complex`. `action`: `respond` (frase pronta resolve), `escalate` (precisa de IA ou de
@@ -143,8 +152,10 @@ As regras do meu negócio (seção 1) têm prioridade sobre as regras abaixo.
 
 1. Saudação no `SessionStarted`, com `calibrate=True`, curta e dizendo o que o agente resolve.
 2. Em todo `Transcript`: se `assessment.ignore`, chame `done_processing()`; se não for `usable`, peça para
-   repetir. Conte como falha também `Decision` com `decision.unclear` (fala confusa: peça para repetir e não
-   aja sobre ela); zere o contador quando a conversa avançar. Depois de 3 falhas
+   repetir. **Ligue o `guard`** em `sessions.create(guard={"enabled": True, "steer": "...", "drift": "...",
+   "off_topic": "...", "give_up": "..."})` com frases do meu negócio: a Ermis responde sozinha a fala confusa,
+   a divagação e o assunto fora do tema e volta à pergunta atual. Nessas falas a `Decision` vem com
+   `handled=True`: ignore. Não reimplemente essa lógica no agente. Depois de 3 falhas
    seguidas, despeça-se e encerre (ou transfira, se o negócio pedir).
 3. Decida a resposta no `Decision`, nunca comparando o texto com palavras. Passe os assuntos do meu negócio
    em `custom_intents` na sessão e use `decision.business_intent()` em vez de `intent`: "minha internet caiu"

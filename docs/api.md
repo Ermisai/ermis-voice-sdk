@@ -136,6 +136,7 @@ Base: `https://api.ermis.ai`
 | `barge_in.min_speech_ms` | int | `150` | Fala contínua necessária para interromper |
 | `max_duration_s` | int | `1800` | Duração máxima da sessão |
 | `vocabulary` | lista | `[]` | Palavras do seu negócio (sabores, serviços, produtos; até 200). Quando o cliente fala uma delas e a transcrição sai parecida ("marquerita"), o texto já chega corrigido ("margherita"), antes das decisões ([ver abaixo](#vocabulário-do-seu-negócio)) |
+| `guard` | objeto | desligado | A Ermis responde sozinha a fala confusa, à divagação e ao assunto fora do tema, com as frases do seu negócio, e volta à pergunta atual ([ver abaixo](#fluxo-da-conversa-decidido-pela-ermis)) |
 | `custom_intents` | lista | `[]` | Intenções do seu negócio (`key`, `label`, `description`; até 20). Cada decisão automática já traz `custom_intent` com a escolhida, sem pedido extra ([ver abaixo](#intenções-customizadas)) |
 | `waiting` | objeto | [ver abaixo](#enquanto-a-sua-ia-pensa) | Mensagens de espera e tempo limite enquanto a sua IA prepara a resposta |
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
@@ -167,6 +168,7 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | Mensagem | Efeito |
 |---|---|
 | `{"type": "speak", "id": "r1", "text": "…"}` | O agente fala. Campos opcionais: `voice`, `allow_barge_in` (padrão `true`), `calibrate` (use `true` na primeira fala) |
+| `{"type": "ask", "id": "q1", "text": "De qual sabor?", "choices": […], "precise": true}` | Uma pergunta: fala como `speak` e vira a **pergunta atual** (o `guard` a repete depois de um desvio). Opcionais: `choices` (as respostas esperadas, `key`/`label`/`description`: a `decision` traz `choice`), `precise` (como `expect_precise`) e `slot` (como `expect_slot`, com o `id` da pergunta) ([ver abaixo](#fluxo-da-conversa-decidido-pela-ermis)) |
 | `{"type": "interrupt"}` | Para a fala atual do agente |
 | `{"type": "decide", "id": "d1", "text": "…", "custom_intents": […]}` | Pede uma decisão, com intenções suas ([ver abaixo](#intenções-customizadas)) |
 | `{"type": "extract_slot", "id": "s1", "text": "…", "slot": {"name": "email", "type": "email"}}` | Extrai um dado da fala |
@@ -227,6 +229,10 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
 | `custom_intent_confidence` | De 0 a 1: quanto a escolha de `custom_intent` é segura. Frases truncadas ou fora do assunto que ainda caem numa intenção sua vêm baixas (abaixo de 0,8): trate como `other` |
+| `answer` | `yes`, `no` ou `null`: o sim/não da fala, com a sua intenção em primeiro lugar ("eu não quero calabresa, quero quatro queijos" é mudança de pedido, não um "não") |
+| `guidance` | `unclear` (fala confusa), `drifting` (divagação), `off_topic` (pergunta fora do seu negócio) ou `null` (uma resposta para o seu roteiro) |
+| `handled` / `guided_text` | Com o `guard`: `true` quando a Ermis já respondeu a fala (o que ela disse vem em `guided_text`); o seu agente não responde |
+| `choice` / `choice_confidence` | Com `ask` e `choices`: a resposta esperada que o cliente quis dizer (ou `none`) e o quanto a escolha é segura (use a partir de 0,8) |
 | `extracted.name` | Nome do cliente, quando ele se apresenta ou corrige o nome |
 
 
@@ -238,6 +244,28 @@ No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Futu
 
 
 No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
+
+### Fluxo da conversa decidido pela Ermis
+
+O seu roteiro guarda as respostas e as perguntas do negócio; o que acontece entre elas fica com a Ermis:
+
+1. **Pergunte com `ask`**, não com `speak`. A pergunta vira a pergunta atual e pode levar as respostas esperadas:
+   ```json
+   {"type": "ask", "id": "q3", "text": "De qual sabor?", "precise": true,
+    "choices": [{"key": "calabresa", "label": "calabresa"}, {"key": "chocolate", "label": "chocolate", "description": "a pizza doce"}]}
+   ```
+   A `decision` da resposta traz `choice` (aqui, `chocolate`) e `choice_confidence`. A Ermis entende respostas mal transcritas ou ditas de outro jeito ("pit sapequena dissocolate", "aquela doce") e, quando não tem certeza, devolve confiança baixa em vez de chutar. Medido: nenhuma escolha errada com confiança de 0,8 ou mais, e a mesma latência sem `choices`.
+2. **Ligue o `guard`** com as frases do seu negócio:
+   ```json
+   "guard": {"enabled": true, "repeat": "Desculpa, não entendi direito. Pode repetir?",
+             "steer": "Vamos voltar ao seu pedido?", "drift": "Tá bom! Voltando ao seu pedido:",
+             "off_topic": "Isso eu não sei te dizer, aqui eu cuido dos pedidos.",
+             "give_up": "Tô com dificuldade pra te entender. Tenta ligar de novo, por favor.", "max_unclear": 3}
+   ```
+   Fala confusa: a Ermis pede para repetir; na segunda seguida, volta à pergunta atual ("Vamos voltar ao seu pedido? De qual sabor?"); na terceira (`max_unclear`), diz `give_up` e encerra (ou só avisa, com `"on_give_up": "notify"`, para você transferir). Divagação e assunto fora do tema: a frase do negócio e a pergunta atual. A expectativa da pergunta (`precise`, `slot`, `choices`) vale de novo para a próxima resposta. Nessas falas a `decision` chega com `handled: true`: não responda.
+3. **Use `answer`** para sim/não, não o `intent` (`confirm_yes`/`confirm_no` vem também em frases que são outra coisa).
+
+No SDK: `question = await call.ask(texto, choices=[...], precise=True, slot=(...))`; na `Decision`: `handled`, `guided_text`, `answer`, `chosen()` e `guidance`.
 
 ### Vocabulário do seu negócio
 

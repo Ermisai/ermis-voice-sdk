@@ -5,7 +5,7 @@ Este SDK é a ponte do seu backend até ela: cria sessões e entrega os eventos
 da ligação como objetos Python, com métodos para mandar o agente agir.
 """
 
-from .call import Call, CustomIntent
+from .call import Call, CustomIntent, Question
 from .client import Ermis, Session, Voice
 from .errors import (
     APIError,
@@ -66,6 +66,7 @@ __all__ = [
     "InsufficientCreditsError",
     "InvalidRequestError",
     "MaxDurationError",
+    "Question",
     "RateLimitError",
     "ReplyTimeout",
     "Session",
