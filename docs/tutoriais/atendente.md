@@ -1,8 +1,10 @@
-# Tutorial: configure um atendente ou uma URA por voz, passo a passo
+# Tutorial: atendente com URA e IA, passo a passo
 
-Este tutorial monta, do zero, o atendente de uma clínica fictícia: a **Lia**, da **Clínica Bem Estar**. Ela atende por telefone (Twilio) ou por um botão no site e responde sozinha às perguntas frequentes. Se o cliente quer agendar ou falar do financeiro, ela transfere a ligação, como uma URA por voz. As dúvidas abertas vão para a sua IA. Cada passo acrescenta uma parte da configuração. O resultado completo está em [`examples/clinica.py`](../examples/clinica.py).
+Este tutorial monta, do zero, o atendente de uma clínica fictícia: a **Lia**, da **Clínica Bem Estar**. Ela atende por telefone (Twilio) ou por um botão no site e responde sozinha às perguntas frequentes. Se o cliente quer agendar ou falar do financeiro, ela transfere a ligação, como uma URA por voz. As dúvidas abertas vão para a sua IA. Cada passo acrescenta uma parte da configuração. O resultado completo está em [`examples/clinica.py`](../../examples/clinica.py).
 
-Se você ainda não ouviu o agente nenhuma vez, faça antes os passos 1 a 3 de [Primeiros passos](primeiros-passos.md), que levam uns 10 minutos.
+Este é o tutorial mais completo: ele explica cada ajuste da configuração. Os outros [tutoriais](README.md) partem dele e mostram cenários específicos (URA, agendamento, pedidos, assistente com IA, ligação ativa).
+
+Se você ainda não ouviu o agente nenhuma vez, faça antes os passos 1 a 3 de [Primeiros passos](../primeiros-passos.md), que levam uns 10 minutos.
 
 | Passo | O que você configura |
 |---|---|
@@ -33,7 +35,7 @@ flowchart TB
     c2 -->|não| c3["Camada 3<br/>a sua IA responde"]
 ```
 
-Quanto mais falas a camada 1 e a camada 2 resolvem, mais rápido e previsível fica o atendimento. A IA, na camada 3, só recebe o que sobra.
+Quanto mais falas a camada 1 e a camada 2 resolvem, mais rápido e previsível fica o atendimento. A camada 3 é a sua IA externa (o modelo que você escolhe, chamado do seu servidor) e só recebe o que sobra.
 
 ## 1. Ambiente e chave
 
@@ -129,7 +131,7 @@ No navegador:
 3. Toque o áudio recebido (PCM16 48 kHz) e descarte a fila ao receber `{"type": "clear"}` (o cliente interrompeu).
 4. Ao receber `{"type": "audio.end", "id"}`, responda `{"type": "playback_finished", "id"}` quando aquela fala terminar de tocar.
 
-Detalhes do protocolo em [Conectando o áudio](api.md#conectando-o-áudio). Para só testar a conversa pelo microfone, sem escrever o front-end, use a aba **Ligação** da Área de Teste na plataforma da Ermis.
+Detalhes do protocolo em [Conectando o áudio](../api.md#conectando-o-áudio). Para só testar a conversa pelo microfone, sem escrever o front-end, use a aba **Ligação** da Área de Teste na plataforma da Ermis.
 
 ## 3. Identidade do agente
 
@@ -268,7 +270,7 @@ Outros dois valores, `"local_first"` e `"local_only"`, servem para quando o reco
 
 **A maior parte da espera costuma ser a sua resposta**, não a transcrição. Respostas prontas (camada 2) e respostas curtas da IA (camada 3) pesam mais na latência do que qualquer ajuste desta tabela.
 
-Mais detalhes em [Perguntas frequentes: qualidade e latência](api.md#perguntas-frequentes-qualidade-e-latência).
+Mais detalhes em [Perguntas frequentes: qualidade e latência](../api.md#perguntas-frequentes-qualidade-e-latência).
 
 ## 6. Mensagens de espera
 
@@ -288,7 +290,7 @@ ESPERA = WaitingOptions(
 await ermis.sessions.create(..., waiting=ESPERA)
 ```
 
-Se você já sabe que um passo vai demorar, avise antes, com uma frase própria: `await call.thinking("Deixa eu verificar isso pra você.")`. Todas as opções estão em [Enquanto a sua IA pensa](api.md#enquanto-a-sua-ia-pensa).
+Se você já sabe que um passo vai demorar, avise antes, com uma frase própria: `await call.thinking("Deixa eu verificar isso pra você.")`. Todas as opções estão em [Enquanto a sua IA pensa](../api.md#enquanto-a-sua-ia-pensa).
 
 ## 7. As três camadas de resposta
 
@@ -408,7 +410,7 @@ else:
 
 `business_intent()` só devolve uma intenção sua quando a escolha é segura (confiança de 0,8 ou mais). Abaixo disso, devolve `"other"` e a fala segue para a camada 3, em vez de o agente agir num palpite.
 
-**URA só por voz.** Para uma URA pura, sem IA, troque a camada 3 por uma pergunta de volta ("É sobre agendamento ou financeiro?") e transfira para uma pessoa depois de duas tentativas. É o que faz [`examples/ura.py`](../examples/ura.py), que também pede o CPF antes de transferir para o financeiro.
+**URA só por voz.** Para uma URA pura, sem IA, troque a camada 3 por uma pergunta de volta ("É sobre agendamento ou financeiro?") e transfira para uma pessoa depois de duas tentativas. O [tutorial da URA](ura.md) mostra esse caso, com o CPF pedido antes de transferir para o financeiro.
 
 **Perguntas com respostas esperadas.** Quando o agente faz uma pergunta fechada, diga quais respostas espera. A `Decision` traz a escolhida em `chosen()`, mesmo com a fala mal transcrita ou dita de outro jeito:
 
@@ -426,7 +428,7 @@ Para sim ou não, use `event.answer` (`"yes"`, `"no"` ou `None`), não o `intent
 
 ### 7.3 Camada 3: a sua IA
 
-O que sobrou (dúvidas abertas, perguntas fora do roteiro) vai para a sua IA. A Ermis não escolhe o modelo: você chama o modelo que quiser, no seu servidor, e fala a resposta com `speak`. O exemplo usa o Claude, pelo SDK da Anthropic:
+O que sobrou (dúvidas abertas, perguntas fora do roteiro) vai para a sua IA externa. A Ermis não escolhe o modelo: você chama o modelo que quiser, no seu servidor, e fala a resposta com `speak`. O exemplo usa o Claude, pelo SDK da Anthropic:
 
 ```bash
 pip install anthropic
@@ -539,14 +541,14 @@ Os dados que o agente coletou (nome, CPF, motivo) podem ir para o seu CRM antes 
 
 ## 9. Teste e ajuste
 
-**Sem telefone.** O laço da conversa (`conduzir`) recebe o `Call` de qualquer canal de controle. Os testes de [`tests/test_example_flows.py`](../tests/test_example_flows.py) usam uma Voice API simulada, que faz o papel do cliente: troque as falas do roteiro e confira o que o agente respondeu. Os testes da clínica conferem as três camadas: a resposta pronta, a pergunta que vai para a IA e a transferência.
+**Sem telefone.** O laço da conversa (`conduzir`) recebe o `Call` de qualquer canal de controle. Os testes de [`tests/test_example_flows.py`](../../tests/test_example_flows.py) usam uma Voice API simulada, que faz o papel do cliente: troque as falas do roteiro e confira o que o agente respondeu. Os testes da clínica conferem as três camadas: a resposta pronta, a pergunta que vai para a IA e a transferência.
 
 ```bash
 pip install -e ".[dev]"
 python -m pytest tests/test_example_flows.py -q
 ```
 
-**Com o seu áudio.** [`examples/primeira_ligacao.py`](../examples/primeira_ligacao.py) envia uma fala gravada em WAV e salva a resposta do agente, sem Twilio nem navegador.
+**Com o seu áudio.** [`examples/primeira_ligacao.py`](../../examples/primeira_ligacao.py) envia uma fala gravada em WAV e salva a resposta do agente, sem Twilio nem navegador.
 
 **Com ligações reais.** Ligue de um celular, num lugar silencioso e num lugar barulhento, falando rápido e devagar. Registre os eventos `Transcript` (o que foi entendido), `NoiseCalibrated`, `WarningEvent` e `SessionEnded` (o motivo do fim), e ajuste:
 
@@ -561,11 +563,11 @@ python -m pytest tests/test_example_flows.py -q
 | A IA inventa informações | Coloque os fatos no prompt e dê a ela a saída `[TRANSFERIR]` |
 | Muitas ligações terminam em `too_noisy` | Tire o `too_noisy` do `guard` e peça ao cliente para falar mais perto do telefone |
 
-Antes de ir para produção, passe pela [lista de conferência](primeiros-passos.md#8-antes-de-ir-para-produção).
+Antes de ir para produção, passe pela [lista de conferência](../primeiros-passos.md#8-antes-de-ir-para-produção).
 
 ## O resultado
 
-O exemplo [`examples/clinica.py`](../examples/clinica.py) junta todos os passos:
+O exemplo [`examples/clinica.py`](../../examples/clinica.py) junta todos os passos:
 
 ```bash
 pip install ermis-voice fastapi uvicorn python-multipart anthropic
@@ -576,4 +578,4 @@ uvicorn clinica:app --port 8000
 
 Para adaptar ao seu negócio, troque as constantes do começo do arquivo: o nome, a voz, a saudação, as intenções, as respostas prontas, os setores e o prompt da IA. O laço da conversa continua o mesmo.
 
-Outros exemplos com a mesma estrutura: [`agendamento.py`](../examples/agendamento.py) (marcar, remarcar e cancelar, com confirmação), [`ura.py`](../examples/ura.py) (URA sem IA, com CPF) e [`pizzaria.py`](../examples/pizzaria.py) (pedido por etapas, com `ask`, `choices` e endereço lido pelo reconhecimento preciso).
+Próximos passos: os [outros tutoriais](README.md) usam a mesma estrutura em cenários diferentes, como uma [URA](ura.md) sem IA, um [agendamento](agendamento.md) com coleta de dados e um [assistente](assistente-ia.md) em que a IA conduz a conversa e consulta o seu sistema.

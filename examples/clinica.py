@@ -1,6 +1,6 @@
 """Clínica Bem Estar: atendente com URA por voz, respostas prontas e IA, montado no tutorial.
 
-Passo a passo completo em docs/tutorial-atendente.md. As três camadas de resposta:
+Passo a passo completo em docs/tutoriais/atendente.md. As três camadas de resposta:
 
 1. A Ermis cuida sozinha (``guard``): ruído, fala confusa, divagação, assunto fora do tema e cliente calado.
 2. Respostas pré-definidas: as frases da clínica (horário, endereço, convênios) e a URA (agendamento,

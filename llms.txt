@@ -7,7 +7,9 @@ Use somente as classes e os métodos documentados nos links abaixo. A chave (`ER
 ## Documentação
 
 - [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a um número de telefone atendido pelo agente, com o laço de eventos e a lista de conferência para produção
-- [Tutorial: atendente e URA passo a passo](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutorial-atendente.md): Twilio ou navegador, nome e voz do agente, calibragem de ruído (`calibrate`, `NoiseCalibrated`), perfis de qualidade e latência, `guard`, respostas pré-definidas com `custom_intents` e a IA do cliente na camada 3
+- [Tutoriais](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/README.md): um agente completo por cenário, e as três camadas de resposta (`guard`, respostas pré-definidas, a IA externa do cliente)
+- [Tutorial do atendente](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md): Twilio ou navegador, nome e voz do agente, calibragem de ruído (`calibrate`, `NoiseCalibrated`), perfis de qualidade e latência, `guard`, respostas pré-definidas com `custom_intents` e a IA do cliente na camada 3
+- Tutoriais por cenário: [URA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ura.md), [agendamento](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/agendamento.md), [pedidos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/pedidos.md), [assistente com IA e ferramentas](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/assistente-ia.md), [ligação ativa](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ligacao-ativa.md)
 - [README e referência do SDK](https://github.com/Ermisai/ermis-voice-sdk/blob/main/README.md): `Ermis`, `Session`, `Call`, eventos, opções e exceções
 - [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, áudio e erros
 - [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): prompt completo para gerar um agente com testes
@@ -19,6 +21,8 @@ Use somente as classes e os métodos documentados nos links abaixo. A chave (`ER
 - [agendamento.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py): marcar, remarcar e cancelar consultas
 - [ura.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py): URA por voz com transferência por setor
 - [clinica.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/clinica.py): o resultado do tutorial, com respostas em três camadas (`guard`, respostas prontas e URA, IA)
+- [assistente_ia.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/assistente_ia.py): suporte técnico conduzido pela IA do cliente, com ferramentas que consultam o sistema
+- [confirmacao.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/confirmacao.py): ligação ativa pelo Twilio, que confirma uma consulta e registra o resultado
 - [pizzaria.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/pizzaria.py): pedidos de pizza por objetivos, com vocabulário do cardápio, endereço lido pelo reconhecimento preciso, dúvidas e fala fora do assunto
 
 ## Opcional

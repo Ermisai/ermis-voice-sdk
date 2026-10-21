@@ -289,3 +289,77 @@ def test_clinic_quality_profiles_only_use_session_options(monkeypatch):
     accepted = set(inspect.signature(_Sessions.create).parameters)
     for perfil in exemplo.PERFIS.values():
         assert set(perfil) <= accepted, set(perfil) - accepted
+
+
+async def test_support_identifies_the_customer_and_hands_over_to_the_ai(monkeypatch):
+    exemplo = _load(monkeypatch, "assistente_ia")
+    vistos = []
+    transferidos = []
+
+    async def responder_com_ia(historico, cliente, cpf, avisar):
+        vistos.append((historico[-1], cliente["nome"], cpf))
+        if len(vistos) == 1:
+            await avisar("Deixa eu verificar aqui no sistema.")
+            return "O seu modem está desligado. Pode tirar da tomada por trinta segundos e ligar de novo?"
+        return f"Então vou te passar para um técnico. {exemplo.MARCA_TRANSFERIR}"
+
+    async def transferir(call_sid):
+        transferidos.append(call_sid)
+
+    monkeypatch.setattr(exemplo, "responder_com_ia", responder_com_ia)
+    monkeypatch.setattr(exemplo, "transferir", transferir)
+    falas = [
+        ("um dois três quatro cinco seis sete oito nove zero zero", "complex", False),
+        ("minha internet caiu", "complaint", False),
+        ("já fiz isso e nada", "confirm_yes", False),
+    ]
+    received = await _run(exemplo, falas, {}, {"cpf": "123.456.789-00"}, call_sid="CA1")
+
+    ask = received[0]
+    assert ask["type"] == "ask" and ask["slot"]["type"] == "cpf", "the CPF is read by the precise recognizer"
+    assert vistos[0] == (("cliente", "minha internet caiu"), "Maria", "123.456.789-00")
+    assert {"type": "thinking", "message": "Deixa eu verificar aqui no sistema."} in received
+    assert "[TRANSFERIR]" not in _said(received)[-1]
+    assert transferidos == ["CA1"]
+
+
+async def _confirm(monkeypatch, falas, decisoes):
+    exemplo = _load(monkeypatch, "confirmacao")
+    registros = []
+
+    async def registrar(consulta, resultado):
+        registros.append(resultado)
+
+    monkeypatch.setattr(exemplo, "registrar", registrar)
+    consulta = exemplo.Consulta(
+        id="c1", paciente="Maria", telefone="+5511999990000", quando="amanhã às 14h30", especialidade="dermatologia"
+    )
+    received = await _run(exemplo, falas, decisoes, {}, consulta=consulta)
+    return exemplo, registros, _said(received)
+
+
+async def test_outbound_reminder_is_confirmed(monkeypatch):
+    exemplo, registros, said = await _confirm(
+        monkeypatch, [("sim, sou eu", "confirm_yes", False), ("pode deixar, eu vou", "confirm_yes", False)], {}
+    )
+    assert said[0] == "Olá! Falo com Maria?"
+    assert "dermatologia, amanhã às catorze horas e trinta" in said[1], "the voice reads 14h30 in words"
+    assert registros == ["confirmada"] and said[-1] == exemplo.FINAIS["confirmada"]
+
+
+async def test_outbound_reminder_asks_to_reschedule(monkeypatch):
+    falas = [
+        ("sou eu", "confirm_yes", False),
+        ("não vou conseguir", "confirm_no", False),
+        ("quero outro dia", "complex", False),
+    ]
+    exemplo, registros, said = await _confirm(monkeypatch, falas, {"quero outro dia": "remarcar"})
+    assert said[2] == "Tudo bem. Você prefere cancelar ou remarcar para outro dia?"
+    assert registros == ["remarcar"]
+
+
+async def test_outbound_reminder_wrong_person(monkeypatch):
+    exemplo, registros, said = await _confirm(
+        monkeypatch, [("não, aqui não tem nenhuma Maria", "confirm_no", False)], {}
+    )
+    assert registros == ["engano"] and said[-1] == exemplo.FINAIS["engano"]
