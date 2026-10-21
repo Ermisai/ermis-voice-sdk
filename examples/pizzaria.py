@@ -160,9 +160,9 @@ def primeiro_nome(texto: str) -> str:
     return nome.capitalize()
 
 
-def sim_ou_nao(texto: str, decisao: Decision) -> str | None:
+def sim_ou_nao(texto: str, decisao: Decision | None) -> str | None:
     """Sim/não pela decisão do Ermis Voice, e pelas respostas curtas ("só isso") em qualquer lugar da frase."""
-    if decisao.intent in ("confirm_yes", "confirm_no"):
+    if decisao and decisao.intent in ("confirm_yes", "confirm_no"):
         return "sim" if decisao.intent == "confirm_yes" else "nao"
     dito = normalizar(texto)
     curta = len(dito.split()) <= 5
@@ -199,6 +199,47 @@ def ler_pizzas(texto: str) -> list[Pizza]:
     return pizzas
 
 
+TIRAR = {"nao", "sem", "tira", "tirar", "esquece", "cancela", "troca", "trocar", "muda", "mudar"}
+QUERER = {"quero", "queria", "por", "pra", "para", "mas", "prefiro", "coloca", "bota"}
+
+
+def ler_mudanca(texto: str) -> tuple[list[str], list[Pizza]]:
+    """O que o cliente tira e o que quer no lugar: "não quero calabresa, quero quatro queijos".
+
+    Palavras negadas nunca viram pedido. Devolve (sabores tirados, pizzas desejadas).
+    """
+    partes: list[tuple[bool, list[str]]] = [(False, [])]
+    palavras = normalizar(texto.replace(",", " __ ").replace(";", " __ ")).split()
+    for i, palavra in enumerate(palavras):
+        tirando, atuais = partes[-1]
+        tem_sabor = any(f" {f} " in f" {' '.join(atuais)} " for falas in SABORES.values() for f in falas)
+        if palavra in TIRAR and not (palavra == "nao" and tirando):
+            partes.append((True, []))
+        elif (palavra in QUERER and not (i and palavras[i - 1] == "nao")) or (palavra == "__" and tirando):
+            partes.append((False, []))  # o que vem depois é o que o cliente quer; a vírgula fecha o que tirou
+        elif palavra == "e" and palavras[i + 1 : i + 2] == ["de"] and tirando and tem_sabor:
+            partes.append((False, []))  # "não é de calabresa e de frango"
+        else:
+            atuais.append("," if palavra == "__" else palavra)
+    tirados = [p for t, ws in partes if t for p in (ler_pizzas(" ".join(ws)) or [Pizza()]) for p in p.sabores]
+    desejadas = ler_pizzas(", ".join(" ".join(ws) for t, ws in partes if not t))
+    return tirados, desejadas
+
+
+def trocar(pedido: Pedido, tirados: list[str], desejadas: list[Pizza]) -> str:
+    """Troca as pizzas tiradas (ou a última) pelas desejadas, mantendo tamanho e quantidade."""
+    trocadas = [p for p in pedido.pizzas if set(p.sabores) & set(tirados)] if tirados else pedido.pizzas[-1:]
+    base = trocadas[0] if trocadas else None
+    for nova in desejadas:
+        if base and not nova.tamanho:
+            nova.tamanho, nova.quantidade = base.tamanho, base.quantidade
+    pedido.pizzas = [p for p in pedido.pizzas if p not in trocadas] + desejadas
+    pedido.etapa, pedido.erros = "pizzas", 0
+    if desejadas:
+        return f"Trocado: {' e '.join(p.falada() for p in desejadas)}. {proximo_objetivo(pedido)}"
+    return f"Tirei a {base.falada() if base else 'pizza'}. {proximo_objetivo(pedido)}"
+
+
 def proximo_objetivo(pedido: Pedido) -> str:
     """A pergunta do próximo objetivo que falta: nome, pizzas (tamanho e sabor), endereço, confirmação."""
     if not pedido.nome:
@@ -207,7 +248,12 @@ def proximo_objetivo(pedido: Pedido) -> str:
     for pizza in pedido.pizzas:
         if not pizza.tamanho:
             pedido.etapa = "pizzas"
-            return f"E a {pizza.falada()}, vai ser de que tamanho? Tem pequena, média, grande e família."
+            qual = (
+                f"pizza meio {' e meio '.join(pizza.sabores)}"
+                if len(pizza.sabores) == 2
+                else f"pizza de {pizza.sabores[0]}"
+            )
+            return f"E a {qual}, vai ser de que tamanho? Tem pequena, média, grande e família."
         if not pizza.sabores:
             pedido.etapa = "pizzas"
             return f"Beleza, {pizza.falada()}. De qual sabor?"
@@ -254,7 +300,8 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
     """O que dizer a esta fala, e se a ligação termina depois dela."""
     intencao = decisao.business_intent()  # "other" quando a escolha não é segura
     resposta = RESPOSTAS.get(intencao, "")  # dúvida: responde e volta ao objetivo
-    pizzas = [] if intencao.startswith("perguntar_") else ler_pizzas(texto)  # uma pergunta não é pedido
+    tirados, desejadas = ler_mudanca(texto)  # "não quero calabresa" não pede calabresa
+    pizzas = [] if intencao.startswith("perguntar_") else desejadas  # uma pergunta não é pedido
     # "Meu nome é Lucas" mais tarde: o nome foi mal entendido antes; corrige e segue
     nome_corrigido = primeiro_nome(decisao.extracted.get("name") or "")
     if pedido.etapa != "nome" and nome_corrigido and decisao.intent.startswith("name_") and not pizzas:
@@ -263,17 +310,22 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
     if decisao.off_topic and not pizzas and not resposta and pedido.etapa != "mudar":
         return f"Isso eu não sei te dizer, aqui eu cuido dos pedidos da Bella Napoli. {proximo_objetivo(pedido)}", False
 
-    resposta_curta = sim_ou_nao(texto, decisao)
+    # Uma mudança costuma vir como "não quero..." (lida como "não"): aí só as palavras contam ("só isso")
+    resposta_curta = sim_ou_nao(texto, None if intencao == "mudar_pedido" else decisao)
+    troca = bool(tirados or desejadas)
 
     # "Só isso" encerra as pizzas, seja qual for a intenção lida (um não não é mudança de pedido)
-    if pedido.etapa == "mais" and resposta_curta == "nao" and not pizzas and not resposta:
+    if pedido.etapa == "mais" and resposta_curta == "nao" and not pizzas and not resposta and not troca:
         pedido.etapa = "endereco"
         return proximo_objetivo(pedido), False
-    # Mudar o pedido: o endereço recomeça; as pizzas, só depois de perguntar (nada se perde por engano)
-    if intencao == "mudar_pedido" and pedido.pizzas and pedido.etapa not in ("pizzas", "mudar"):
+    # Mudar o pedido, em qualquer etapa: o endereço recomeça; "não quero calabresa, quero quatro queijos" troca
+    # aquela pizza; sem detalhe, pergunta o que mudar (nada se perde por engano)
+    if intencao == "mudar_pedido" and pedido.pizzas and pedido.etapa != "mudar":
         if re.search(r"endereco|rua|numero|bairro", normalizar(texto)):
             pedido.endereco = ""
             return proximo_objetivo(pedido), False
+        if troca:
+            return trocar(pedido, tirados, desejadas), False
         pedido.etapa = "mudar"
         return "Claro! O que você quer mudar, as pizzas ou o endereço?", False
     if pedido.etapa == "mudar":
