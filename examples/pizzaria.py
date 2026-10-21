@@ -36,8 +36,6 @@ _conversas: set[asyncio.Task] = set()
 SAUDACAO = "Oi, boa noite! Pizzaria Bella Napoli, aqui é o Rafael. Com quem eu falo?"
 DESPEDIDA = "Eu que agradeço! Tenha um ótimo dia."
 ASSUNTO = "ao seu pedido"  # para voltar ao assunto depois de um desvio
-REPETIR = "Desculpa, não entendi direito. Pode repetir?"
-DESISTIR = "Tô com dificuldade pra te ouvir. Tenta ligar de novo, por favor. Até mais!"
 TRANSFERIR = "Vou te passar para um atendente. Um momento, por favor."
 
 # ── O que o cliente pode querer (o Ermis Voice entende; você só lista) ──────
@@ -81,8 +79,12 @@ SABORES = {
     "margherita": ("margherita", "marguerita", "margarita"),
     "portuguesa": ("portuguesa",),
     "pepperoni": ("pepperoni", "peperoni"),
-    "chocolate": ("chocolate", "brigadeiro", "doce"),  # a única pizza doce: "metade doce"
+    "chocolate": ("chocolate", "brigadeiro"),
 }
+# Os sabores como respostas esperadas das perguntas sobre pizza: o Ermis Voice entende o sabor dito de outro
+# jeito ou mal transcrito e diz qual foi (Decision.chosen())
+SABORES_ESPERADOS = [CustomIntent(s, s) for s in SABORES]
+
 QUANTIDADES = {"uma": 1, "um": 1, "duas": 2, "dois": 2, "tres": 3}
 PRECOS = (
     "A pequena custa trinta e nove reais, a média quarenta e nove, a grande cinquenta e nove "
@@ -162,8 +164,8 @@ def primeiro_nome(texto: str) -> str:
 
 def sim_ou_nao(texto: str, decisao: Decision | None) -> str | None:
     """Sim/não pela decisão do Ermis Voice, e pelas respostas curtas ("só isso") em qualquer lugar da frase."""
-    if decisao and decisao.intent in ("confirm_yes", "confirm_no"):
-        return "sim" if decisao.intent == "confirm_yes" else "nao"
+    if decisao and decisao.answer:  # o sim/não do Ermis Voice, com a intenção do negócio em primeiro lugar
+        return "sim" if decisao.answer == "yes" else "nao"
     dito = normalizar(texto)
     curta = len(dito.split()) <= 5
     if re.match(r"(nao|negativo|nada)\b", dito) or (curta and re.search(r"\b(so isso|e so|mais nada)\b", dito)):
@@ -302,6 +304,12 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
     resposta = RESPOSTAS.get(intencao, "")  # dúvida: responde e volta ao objetivo
     tirados, desejadas = ler_mudanca(texto)  # "não quero calabresa" não pede calabresa
     pizzas = [] if intencao.startswith("perguntar_") else desejadas  # uma pergunta não é pedido
+    sabor = decisao.chosen()  # as palavras não bateram com o cardápio, mas o Ermis Voice sabe o sabor
+    if sabor and pedido.etapa in ("pizzas", "mais") and intencao != "mudar_pedido":
+        if not pizzas:
+            pizzas = [Pizza(1, None, [sabor])]
+        for pizza in pizzas:  # o tamanho veio das palavras, o sabor do Ermis Voice
+            pizza.sabores = pizza.sabores or [sabor]
     # "Meu nome é Lucas" mais tarde: o nome foi mal entendido antes; corrige e segue
     nome_corrigido = primeiro_nome(decisao.extracted.get("name") or "")
     if pedido.etapa != "nome" and nome_corrigido and decisao.intent.startswith("name_") and not pizzas:
@@ -408,56 +416,45 @@ async def responder(call: Call, pedido: Pedido, texto: str, decisao: Decision) -
     return await responder_com_ia(texto, pedido) or "Não entendi. Pode dizer de outro jeito?", False
 
 
+async def falar(call: Call, pedido: Pedido, texto: str, fim: bool = False) -> None:
+    """Fala a resposta. Uma pergunta vai como ``ask``: o Ermis Voice a repete depois de um desvio e lê a
+    resposta como ela precisa ser lida (o nome e as pizzas com precisão, os sabores como respostas esperadas,
+    o endereço como dado)."""
+    if fim or "?" not in texto:  # sem pergunta: uma fala comum
+        await call.speak(texto, allow_barge_in=not fim)
+    elif pedido.etapa == "endereco":
+        pergunta = await call.ask(
+            texto, slot={"name": "endereco", "type": "address", "description": "rua, número e bairro"}
+        )
+        pedido.esperado = pergunta.value
+    elif pedido.etapa in ("pizzas", "mais"):
+        await call.ask(texto, precise=True, choices=SABORES_ESPERADOS)
+    else:
+        await call.ask(texto, precise=pedido.etapa == "nome")
+
+
 async def conduzir(call: Call) -> None:
     pedido = Pedido()
     falas: dict[str, str] = {}
     encerrando = False
-    confusas = 0  # falas confusas seguidas
     async for event in call:
         if isinstance(event, SessionStarted):
-            await call.speak(SAUDACAO, calibrate=True)
-            await call.expect_precise()  # a resposta é um nome, em uma ou duas palavras
+            await call.ask(SAUDACAO, precise=True, calibrate=True)  # a resposta é um nome, em uma ou duas palavras
 
         elif isinstance(event, Transcript):
-            if event.assessment.ignore:
-                await call.done_processing()  # ruído: o agente volta a ouvir
-            elif not event.assessment.usable:
-                await call.speak("Desculpe, não entendi. Pode repetir, por favor?")
-            else:
+            if not event.handled and event.assessment.usable:  # ruído e fala ilegível: o Ermis Voice já cuidou
                 falas[event.utterance_id or ""] = event.text
 
         elif isinstance(event, Decision) and not encerrando:
+            if event.handled:  # fala confusa, divagação ou fora do tema: o Ermis Voice já respondeu
+                continue
             if event.is_escape:  # despedida ou pedido de atendente: o Ermis Voice já percebeu
                 encerrando = True
                 await call.speak(TRANSFERIR if event.intent == "request_human" else DESPEDIDA, allow_barge_in=False)
                 continue
-            if event.unclear:  # fala confusa: pede para repetir em vez de agir num palpite
-                confusas += 1
-                encerrando = confusas >= 3
-                if encerrando:
-                    await call.speak(DESISTIR, allow_barge_in=False)
-                elif confusas == 2:  # duas seguidas: volta ao assunto em vez de repetir de novo
-                    await call.speak(f"Vamos voltar {ASSUNTO}? {proximo_objetivo(pedido)}")
-                else:
-                    await call.speak(REPETIR)
-                if not encerrando and pedido.etapa in ("nome", "pizzas", "mais"):
-                    await call.expect_precise()
-                continue
-            confusas = 0
-            if event.drifting:  # o cliente divagou: reconhece e volta à pergunta em que estava
-                await call.speak(f"Tá bom! Voltando {ASSUNTO}: {proximo_objetivo(pedido)}")
-                if pedido.etapa in ("nome", "pizzas", "mais"):
-                    await call.expect_precise()
-                continue
             resposta, fim = await responder(call, pedido, falas.get(event.utterance_id or "", ""), event)
             encerrando = fim
-            await call.speak(resposta, allow_barge_in=not fim)
-            if not fim and pedido.etapa in ("nome", "pizzas", "mais"):
-                # Nome, sabor e tamanho em uma ou duas palavras: a resposta sai do reconhecimento preciso
-                await call.expect_precise()
-            if pedido.etapa == "endereco" and pedido.esperado is None:
-                # A próxima resposta é o endereço: o Ermis Voice lê com o reconhecimento preciso
-                pedido.esperado = await call.expect_slot("endereco", "address", description="rua, número e bairro")
+            await falar(call, pedido, resposta, fim)
 
         elif isinstance(event, SpeakDone) and encerrando:
             await call.end()
@@ -471,6 +468,15 @@ async def voz() -> Response:
         voice="man",
         custom_intents=INTENCOES,  # cada decisão já diz qual delas o cliente quis
         vocabulary=VOCABULARIO,  # o texto já chega com os sabores escritos certo
+        # O fluxo fica com o Ermis Voice: fala confusa, divagação e fora do tema, com as frases da pizzaria
+        guard={
+            "enabled": True,
+            "repeat": "Desculpa, não entendi direito. Pode repetir?",
+            "steer": f"Vamos voltar {ASSUNTO}?",
+            "drift": f"Tá bom! Voltando {ASSUNTO}:",
+            "off_topic": "Isso eu não sei te dizer, aqui eu cuido dos pedidos da Bella Napoli.",
+            "give_up": "Tô com dificuldade pra te ouvir. Tenta ligar de novo, por favor. Até mais!",
+        },
         turn_detection="smart_turn",
         early_turn={"speculate": True, "close_on_complete_text": True},
     )

@@ -35,6 +35,7 @@ async def _run(module, falas, decisoes, slots, **kwargs):
     ``slots``: nome do slot -> valor (None: não encontrado). Devolve os comandos recebidos."""
     received: list[dict] = []
     pendentes = list(falas)
+    pendentes_slot: list[tuple[str, str | None]] = []
 
     async def handler(ws):
         await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
@@ -65,7 +66,13 @@ async def _run(module, falas, decisoes, slots, **kwargs):
                 value = slots.get(msg["slot"]["name"])
                 status = "found" if value else "not_found"
                 await ws.send(json.dumps({"type": "slot", "id": msg["id"], "value": value, "status": status}))
-            elif kind == "speak":
+            elif kind == "ask" and msg.get("slot"):
+                # The value of the answer comes as a slot with the id of the question, after its decision
+                value = slots.get(msg["slot"]["name"])
+                pendentes_slot.append((msg["id"], value))
+            if kind == "ask":
+                kind = "speak"  # a question is spoken like any other line
+            if kind == "speak":
                 await ws.send(json.dumps({"type": "speak.done", "id": msg["id"], "chars": len(msg["text"])}))
                 if msg.get("allow_barge_in") is False or not pendentes:
                     continue
@@ -83,9 +90,14 @@ async def _run(module, falas, decisoes, slots, **kwargs):
                             "is_escape": escape,
                             "custom_intent": decisoes.get(texto, "other"),
                             "custom_intent_confidence": 1.0,
+                            "answer": {"confirm_yes": "yes", "confirm_no": "no"}.get(intent),
                         }
                     )
                 )
+                for slot_id, value in pendentes_slot:
+                    status = "found" if value else "not_found"
+                    await ws.send(json.dumps({"type": "slot", "id": slot_id, "value": value, "status": status}))
+                pendentes_slot.clear()
             elif kind == "end":
                 await ws.send(json.dumps({"type": "session.ended", "reason": "client"}))
                 return
@@ -98,7 +110,7 @@ async def _run(module, falas, decisoes, slots, **kwargs):
 
 
 def _said(received):
-    return [m["text"] for m in received if m["type"] == "speak"]
+    return [m["text"] for m in received if m["type"] in ("speak", "ask")]
 
 
 async def test_scheduling_books_an_appointment(monkeypatch):
@@ -191,8 +203,9 @@ async def test_pizzeria_takes_an_order_with_the_address_read_by_the_precise_reco
     said = _said(received)
     assert said[1] == "Prazer, João! O que vai ser hoje?"
     assert said[2] == "Anotado, uma grande de calabresa. Quer mais alguma pizza?"
-    expect = next(m for m in received if m["type"] == "expect_slot")
+    expect = next(m for m in received if m["type"] == "ask" and m.get("slot"))
     assert expect["slot"]["name"] == "endereco" and expect["slot"]["type"] == "address"
+    assert any(m["type"] == "ask" and m.get("choices") for m in received), "flavors as expected answers"
     # The address came from expect_slot (the precise reading), and the voice reads "10" as "dez"
     assert "pra entregar na Rua das Flores, dez, Centro" in said[4]
     assert said[-1].startswith("Prontinho, pedido feito!")

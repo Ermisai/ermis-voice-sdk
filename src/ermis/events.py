@@ -67,6 +67,8 @@ class Transcript(Event):
     latency_ms: int | None
     corrections: list[dict[str, Any]] = field(default_factory=list)
     """Palavras ajustadas ao ``vocabulary`` da sessão: ``{"heard", "term", "score"}``."""
+    handled: bool = False
+    """Com o ``guard`` da sessão: a Ermis já cuidou desta fala (ruído, ou pediu para repetir). Não responda."""
 
 
 DRIFT_WORDS = 10  # a partir daqui, uma fala sem nada do negócio é divagação
@@ -325,6 +327,7 @@ def parse_event(msg: dict[str, Any]) -> Event:
             assessment=assessment,
             latency_ms=g("latency_ms"),
             corrections=list(g("corrections") or []),
+            handled=bool(g("handled")),
         )
     if t == "decision":
         return Decision(
