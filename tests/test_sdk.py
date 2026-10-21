@@ -633,3 +633,21 @@ def test_no_reply_event():
     assert isinstance(event, NoReply) and event.count == 1 and event.handled and event.guided_text
     notify = parse_event({"type": "no_reply", "count": 2, "handled": False})
     assert isinstance(notify, NoReply) and not notify.handled and notify.guided_text is None
+
+
+def test_partial_transcripts_noise_and_revised_slot():
+    from ermis import NoiseCalibrated, SlotResult, SpeechStarted, TranscriptPartial, parse_event
+    from ermis.options import session_body
+
+    assert session_body(partial_transcripts=True) == {"partial_transcripts": True}
+    assert "partial_transcripts" not in session_body()
+    partial = parse_event({"type": "transcript.partial", "utterance_id": "u3", "text": "quero saber"})
+    assert isinstance(partial, TranscriptPartial) and (partial.utterance_id, partial.text) == ("u3", "quero saber")
+    assert isinstance(started := parse_event({"type": "speech.started", "utterance_id": "u3"}), SpeechStarted)
+    assert started.utterance_id == "u3"
+    noise = parse_event(
+        {"type": "noise.calibrated", "noise_level": 1800.0, "noise_floor": 2000.0, "samples": 220, "noisy": True}
+    )
+    assert isinstance(noise, NoiseCalibrated) and noise.noisy and noise.samples == 220
+    slot = parse_event({"type": "slot", "id": "e1", "value": "a@b.com", "status": "found", "revised": True})
+    assert isinstance(slot, SlotResult) and slot.revised and slot.found

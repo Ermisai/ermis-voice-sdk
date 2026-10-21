@@ -192,14 +192,15 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `transcript` | Fala transcrita | `utterance_id`, `text`, `uncertain`, `assessment`, `latency_ms`; `corrections` quando palavras foram ajustadas ao seu `vocabulary` |
 | `decision` | Decisão sobre a fala (com `auto_decide` ou após `decide`) | `utterance_id` ou `id`, `intent`, `action`, `is_escape`, `complexity`, `custom_intent`, `extracted` |
 | `slot` | Resposta a `extract_slot` ou a `expect_slot` (com `utterance_id`) | `id`, `value`, `status` (`found`, `not_found` ou `rejected`: a fala não responde ao que foi pedido) |
-| `transcript.revised` | A leitura de maior precisão de uma fala ficou diferente (só com `expect_slot`) | `utterance_id`, `text`, `previous` |
+| `transcript.partial` | O texto até agora, enquanto o cliente fala (com `partial_transcripts`) | `utterance_id`, `text`. No SDK: `TranscriptPartial` |
+| `transcript.revised` | A leitura de maior precisão de uma fala ficou diferente: com `expect_slot`, ou com prioridade de latência (a conversa não esperou por ela) | `utterance_id`, `text`, `previous` |
 | `speak.started` / `speak.done` | Início e fim de uma fala do agente | `id`, `chars` |
 | `barge_in` | O cliente interrompeu o agente | `id` da fala interrompida |
 | `waiting` | O agente falou uma mensagem de espera | `utterance_id`, `kind` (`filler`, `patience`, `timeout`), `text` |
 | `reply_timeout` | A sua resposta não chegou a tempo | `utterance_id`, `action` (`apologize` ou `end`) |
 | `usage` | A cada 60 s | `billed_seconds`, `credits`, `balance` |
 | `no_reply` | O cliente ficou calado depois da fala do agente (`guard`) | `count` (silêncios seguidos), `handled` (`true`: a Ermis já falou `guided_text`; não responda), `guided_text`. No SDK: `NoReply` |
-| `noise.calibrated` | Terminou a medição do ruído de fundo (fala com `calibrate`) | `noise_level`, `noise_floor`, `samples`, `noisy` (com o `guard` `too_noisy`, a Ermis avisa e encerra) |
+| `noise.calibrated` | Terminou a medição do ruído de fundo (fala com `calibrate`) | `noise_level`, `noise_floor`, `samples`, `noisy` (com o `guard` `too_noisy`, a Ermis avisa e encerra). No SDK: `NoiseCalibrated` |
 | `warning` | Algo pede atenção | `code`: `credits_low`, `noisy_environment`, `max_duration_soon`, `late_reply` (um `speak` chegou depois do tempo limite e foi descartado) |
 | `error` | Mensagem inválida ou falha | `code`, `message` |
 | `session.ended` | Fim da sessão | `reason`, `billed_seconds`, `credits` |
@@ -299,7 +300,7 @@ Endereços, e-mails e números ditados são onde a transcrição rápida mais er
 {"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address", "description": "rua, número e bairro"}}
 ```
 
-Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta.
+Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta. Com prioridade de latência (`latency`, `local_first`, `local_only`), o `slot` sai na hora, do texto rápido; se a leitura de maior precisão achar outro valor, chega um segundo `slot` com `revised: true` (no SDK, `SlotResult.revised`).
 
 No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 

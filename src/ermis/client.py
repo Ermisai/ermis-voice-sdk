@@ -94,6 +94,7 @@ class _Sessions:
         language: str = UNSET,
         voice: str = UNSET,
         auto_decide: bool = UNSET,
+        partial_transcripts: bool = UNSET,
         transcription_priority: str = UNSET,
         turn_detection: str = UNSET,
         early_turn: dict[str, Any] = UNSET,
@@ -114,6 +115,9 @@ class _Sessions:
         ``vocabulary`` (lista de palavras): termos do seu negócio (sabores, serviços, produtos). Quando a
         transcrição sai parecida com um deles pelo som ("marquerita"), o texto já chega corrigido.
 
+        ``partial_transcripts``: o texto enquanto o cliente ainda fala (eventos ``TranscriptPartial``), para
+        mostrar na tela ou adiantar trabalho. Pode mudar até a ``Transcript`` final.
+
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
         ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
@@ -126,6 +130,7 @@ class _Sessions:
             language=language,
             voice=voice,
             auto_decide=auto_decide,
+            partial_transcripts=partial_transcripts,
             transcription_priority=transcription_priority,
             turn_detection=turn_detection,
             early_turn=early_turn,

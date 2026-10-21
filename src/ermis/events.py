@@ -27,7 +27,9 @@ class SessionStarted(Event):
 
 @dataclass(frozen=True)
 class SpeechStarted(Event):
-    """O cliente final começou a falar."""
+    """O cliente final começou a falar. ``utterance_id`` é o mesmo dos parciais e da ``Transcript`` dessa fala."""
+
+    utterance_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -201,6 +203,8 @@ class SlotResult(Event):
     value: Any
     status: str
     """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido)."""
+    revised: bool = False
+    """Com prioridade de latência: o valor relido pelo reconhecimento de maior precisão, diferente do primeiro."""
 
     @property
     def found(self) -> bool:
@@ -297,6 +301,27 @@ class TranscriptRevised(Event):
 
 
 @dataclass(frozen=True)
+class TranscriptPartial(Event):
+    """O texto até agora, enquanto o cliente ainda fala (sessão com ``partial_transcripts``). Pode mudar."""
+
+    utterance_id: str | None
+    text: str
+
+
+@dataclass(frozen=True)
+class NoiseCalibrated(Event):
+    """Terminou a medição do ruído de fundo (fala com ``calibrate``, normalmente a saudação).
+
+    ``noisy``: alto demais para entender bem o cliente; com o ``guard`` ``too_noisy``, a Ermis avisa e encerra.
+    """
+
+    noise_level: float | None
+    noise_floor: float | None
+    samples: int
+    noisy: bool
+
+
+@dataclass(frozen=True)
 class NoReply(Event):
     """O cliente ficou calado depois da fala do agente (``guard`` da sessão, ``no_reply_ms``).
 
@@ -321,7 +346,18 @@ def parse_event(msg: dict[str, Any]) -> Event:
     if t == "session.started":
         return SessionStarted(t, msg, session_id=g("session_id", ""), limits=g("limits") or {})
     if t == "speech.started":
-        return SpeechStarted(t, msg)
+        return SpeechStarted(t, msg, utterance_id=g("utterance_id"))
+    if t == "transcript.partial":
+        return TranscriptPartial(t, msg, utterance_id=g("utterance_id"), text=g("text") or "")
+    if t == "noise.calibrated":
+        return NoiseCalibrated(
+            t,
+            msg,
+            noise_level=g("noise_level"),
+            noise_floor=g("noise_floor"),
+            samples=int(g("samples") or 0),
+            noisy=bool(g("noisy")),
+        )
     if t == "speech.ended":
         return SpeechEnded(t, msg, duration_ms=g("duration_ms"))
     if t == "transcript":
@@ -364,7 +400,9 @@ def parse_event(msg: dict[str, Any]) -> Event:
             choice_confidence=g("choice_confidence"),
         )
     if t == "slot":
-        return SlotResult(t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"))
+        return SlotResult(
+            t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised"))
+        )
     if t == "no_reply":
         return NoReply(t, msg, count=int(g("count") or 0), handled=bool(g("handled")), guided_text=g("guided_text"))
     if t == "transcript.revised":
