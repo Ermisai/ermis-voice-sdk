@@ -2,6 +2,8 @@
 
 Este guia leva você da instalação até um atendente atendendo o telefone. Cada passo funciona sozinho: no passo 3 você já ouve o agente, sem telefone e sem navegador.
 
+Depois deste guia, os [tutoriais](tutoriais/README.md) montam agentes completos para cenários comuns: atendente, URA, agendamento, pedidos, assistente com IA e ligação ativa. O [tutorial do atendente](tutoriais/atendente.md) explica cada ajuste da configuração: nome e voz do agente, calibragem de ruído, qualidade e latência, respostas pré-definidas e a sua IA.
+
 Se preferir que um assistente de IA escreva o primeiro agente, use o [prompt pronto](prompt-para-ia.md): descreva o seu negócio e receba o código com testes. Este guia continua útil para entender e ajustar o que ele gerar.
 
 | Passo | O que você faz | Tempo |
@@ -139,6 +141,9 @@ Exemplos completos:
 |---|---|
 | [`atendente_twilio.py`](../examples/atendente_twilio.py) | Atendente geral: frases prontas, sua IA, confirmação, desistência, despedida |
 | [`agendamento.py`](../examples/agendamento.py) | Marcar, remarcar e cancelar consultas: `decide` com intenções do negócio, horários como opções faladas, nome e telefone ditados, confirmação antes de gravar |
+| [`clinica.py`](../examples/clinica.py) | O resultado do [tutorial](tutoriais/atendente.md): respostas prontas, URA e IA em camadas |
+| [`assistente_ia.py`](../examples/assistente_ia.py) | Suporte conduzido pela sua IA, com ferramentas que consultam o seu sistema ([tutorial](tutoriais/assistente-ia.md)) |
+| [`confirmacao.py`](../examples/confirmacao.py) | Ligação ativa: o agente liga e confirma a consulta ([tutorial](tutoriais/ligacao-ativa.md)) |
 | [`ura.py`](../examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para o setor certo, com CPF pedido no financeiro |
 
 ## 6. Ligação de verdade pelo Twilio

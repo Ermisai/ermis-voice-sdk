@@ -8,6 +8,8 @@ O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o c
 
 **Novo por aqui?** O guia [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md) leva você da instalação a um número de telefone atendido pelo agente. No terceiro passo você já ouve o agente, sem telefone e sem navegador.
 
+**Vai montar um agente para um cenário?** Os [tutoriais](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/README.md) montam, passo a passo, um atendente, uma URA, um agendamento, pedidos por telefone, um assistente conduzido pela sua IA e uma ligação ativa. O [tutorial do atendente](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md) explica a configuração inteira: Twilio ou navegador, nome e voz do agente, calibragem de ruído, qualidade e latência, respostas pré-definidas e a sua IA externa (camada 3).
+
 **Prefere começar com um assistente de IA?** Cole o [prompt pronto](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md) no Claude, ChatGPT ou Cursor, descreva o seu negócio e receba o agente com testes.
 
 ## Como funciona
@@ -121,6 +123,9 @@ Exemplo completo, com respostas rápidas, confirmação, desistência e despedid
 | [`atendente_twilio.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py) | Atendente geral por telefone: frases prontas, sua IA, confirmação, desistência e despedida |
 | [`agendamento.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py) | Marcar, remarcar e cancelar consultas: intenções do negócio na sessão, horários como opções faladas (`set_custom_intents`), telefone com `expect_slot`, confirmação |
 | [`ura.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para financeiro, suporte ou vendas; CPF com `expect_slot` |
+| [`clinica.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/clinica.py) | O resultado do [tutorial](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md): atendente com URA por voz, perfis de qualidade e latência, calibragem de ruído, `guard`, respostas prontas e IA na camada 3 |
+| [`assistente_ia.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/assistente_ia.py) | Suporte técnico conduzido pela sua IA: CPF com `ask(slot=...)`, ferramentas que consultam o seu sistema, `guard` com `drift` e `off_topic` vazios |
+| [`confirmacao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/confirmacao.py) | Ligação ativa: o agente liga pelo Twilio, confirma a identidade e a consulta e registra o resultado |
 | [`pizzaria.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/pizzaria.py) | Pedidos de pizza por objetivos (nome, pizzas, endereço): `vocabulary` do cardápio, endereço com `expect_slot`, dúvidas no meio do pedido, `unclear` e `off_topic` |
 
 Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio; o passo a passo está em [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md#6-ligação-de-verdade-pelo-twilio).
@@ -289,6 +294,7 @@ O mesmo erro chega como status HTTP ou código de fechamento do WebSocket; o SDK
 ## Documentação
 
 - [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a uma ligação de verdade, com lista de conferência para produção.
+- [Tutoriais](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/README.md): atendente, URA, agendamento, pedidos, assistente com IA e ligação ativa, passo a passo.
 - [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): gere um agente com o seu assistente de código. Para assistentes que leem a documentação sozinhos, há também o [`llms.txt`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/llms.txt).
 - [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): sessões, canal de controle, decisões, mensagens de espera, áudio e erros.
 - Na plataforma da Ermis: **Documentação API → Ermis Voice** e a aba **Ligação** da Área de Teste, para conversar com o agente pelo microfone.
