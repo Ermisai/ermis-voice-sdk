@@ -297,6 +297,19 @@ class TranscriptRevised(Event):
 
 
 @dataclass(frozen=True)
+class NoReply(Event):
+    """O cliente ficou calado depois da fala do agente (``guard`` da sessão, ``no_reply_ms``).
+
+    ``handled``: a Ermis já perguntou se ele está aí (``guided_text``) ou já se despediu; não responda. Com
+    ``"on_no_reply": "notify"``, o último silêncio chega com ``handled=False``: você decide (transferir, encerrar).
+    """
+
+    count: int
+    handled: bool = False
+    guided_text: str | None = None
+
+
+@dataclass(frozen=True)
 class UnknownEvent(Event):
     """Evento que esta versão do SDK ainda não conhece. Veja ``raw``."""
 
@@ -352,6 +365,8 @@ def parse_event(msg: dict[str, Any]) -> Event:
         )
     if t == "slot":
         return SlotResult(t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"))
+    if t == "no_reply":
+        return NoReply(t, msg, count=int(g("count") or 0), handled=bool(g("handled")), guided_text=g("guided_text"))
     if t == "transcript.revised":
         return TranscriptRevised(
             t, msg, utterance_id=g("utterance_id", ""), text=g("text") or "", previous=g("previous") or ""

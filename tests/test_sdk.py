@@ -624,3 +624,12 @@ async def test_ask_sends_the_question_with_its_expectations_and_decisions_bring_
     assert first.chosen() == "chocolate" and first.text == "aquela doce" and not first.handled
     assert second.handled and second.unclear and second.guided_text == "Pode repetir?"
     assert values[0].value == "Rua X, 10"
+
+
+def test_no_reply_event():
+    from ermis import NoReply, parse_event
+
+    event = parse_event({"type": "no_reply", "count": 1, "handled": True, "guided_text": "Você ainda está aí?"})
+    assert isinstance(event, NoReply) and event.count == 1 and event.handled and event.guided_text
+    notify = parse_event({"type": "no_reply", "count": 2, "handled": False})
+    assert isinstance(notify, NoReply) and not notify.handled and notify.guided_text is None

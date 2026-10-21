@@ -198,6 +198,8 @@ Conecte em `control_url` com a chave de API. Todas as mensagens são JSON.
 | `waiting` | O agente falou uma mensagem de espera | `utterance_id`, `kind` (`filler`, `patience`, `timeout`), `text` |
 | `reply_timeout` | A sua resposta não chegou a tempo | `utterance_id`, `action` (`apologize` ou `end`) |
 | `usage` | A cada 60 s | `billed_seconds`, `credits`, `balance` |
+| `no_reply` | O cliente ficou calado depois da fala do agente (`guard`) | `count` (silêncios seguidos), `handled` (`true`: a Ermis já falou `guided_text`; não responda), `guided_text`. No SDK: `NoReply` |
+| `noise.calibrated` | Terminou a medição do ruído de fundo (fala com `calibrate`) | `noise_level`, `noise_floor`, `samples`, `noisy` (com o `guard` `too_noisy`, a Ermis avisa e encerra) |
 | `warning` | Algo pede atenção | `code`: `credits_low`, `noisy_environment`, `max_duration_soon`, `late_reply` (um `speak` chegou depois do tempo limite e foi descartado) |
 | `error` | Mensagem inválida ou falha | `code`, `message` |
 | `session.ended` | Fim da sessão | `reason`, `billed_seconds`, `credits` |
@@ -262,7 +264,7 @@ O seu roteiro guarda as respostas e as perguntas do negócio; o que acontece ent
              "off_topic": "Isso eu não sei te dizer, aqui eu cuido dos pedidos.",
              "give_up": "Tô com dificuldade pra te entender. Tenta ligar de novo, por favor.", "max_unclear": 3}
    ```
-   Fala confusa: a Ermis pede para repetir; na segunda seguida, volta à pergunta atual ("Vamos voltar ao seu pedido? De qual sabor?"); na terceira (`max_unclear`), diz `give_up` e encerra (ou só avisa, com `"on_give_up": "notify"`, para você transferir). Divagação e assunto fora do tema: a frase do negócio e a pergunta atual. A expectativa da pergunta (`precise`, `slot`, `choices`) vale de novo para a próxima resposta. Nessas falas a `decision` chega com `handled: true`: não responda.
+   Fala confusa: a Ermis pede para repetir; na segunda seguida, volta à pergunta atual ("Vamos voltar ao seu pedido? De qual sabor?"); na terceira (`max_unclear`), diz `give_up` e encerra (ou só avisa, com `"on_give_up": "notify"`, para você transferir). Divagação e assunto fora do tema: a frase do negócio e a pergunta atual. **Cliente calado:** se ninguém fala por `no_reply_ms` (padrão 8000; `0` desliga) depois que o agente termina de falar, a Ermis pergunta `no_reply` ("Você ainda está aí?") e repete a pergunta atual; no `max_no_reply`º silêncio seguido (padrão 2) diz `no_reply_give_up` e encerra (`reason: "no_reply"`), ou só avisa com `"on_no_reply": "notify"`. O agente falando ou pensando não conta. **Ruído:** com `"too_noisy": "…"`, se a medição da saudação (`calibrate`) acusar ambiente alto demais, a Ermis diz a frase e encerra (`reason: "too_noisy"`). A expectativa da pergunta (`precise`, `slot`, `choices`) vale de novo para a próxima resposta. Nessas falas a `decision` chega com `handled: true`: não responda.
 3. **Use `answer`** para sim/não, não o `intent` (`confirm_yes`/`confirm_no` vem também em frases que são outra coisa).
 
 No SDK: `question = await call.ask(texto, choices=[...], precise=True, slot=(...))`; na `Decision`: `handled`, `guided_text`, `answer`, `chosen()` e `guidance`.
