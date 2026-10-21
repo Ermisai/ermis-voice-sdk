@@ -2,6 +2,8 @@
 
 Este guia leva você da instalação até um atendente atendendo o telefone. Cada passo funciona sozinho: no passo 3 você já ouve o agente, sem telefone e sem navegador.
 
+Depois deste guia, o [tutorial do atendente](tutorial-atendente.md) mostra a configuração completa de um atendente ou de uma URA: nome e voz do agente, calibragem de ruído, qualidade e latência, respostas pré-definidas e a sua IA.
+
 Se preferir que um assistente de IA escreva o primeiro agente, use o [prompt pronto](prompt-para-ia.md): descreva o seu negócio e receba o código com testes. Este guia continua útil para entender e ajustar o que ele gerar.
 
 | Passo | O que você faz | Tempo |
@@ -139,6 +141,7 @@ Exemplos completos:
 |---|---|
 | [`atendente_twilio.py`](../examples/atendente_twilio.py) | Atendente geral: frases prontas, sua IA, confirmação, desistência, despedida |
 | [`agendamento.py`](../examples/agendamento.py) | Marcar, remarcar e cancelar consultas: `decide` com intenções do negócio, horários como opções faladas, nome e telefone ditados, confirmação antes de gravar |
+| [`clinica.py`](../examples/clinica.py) | O resultado do [tutorial](tutorial-atendente.md): respostas prontas, URA e IA em camadas |
 | [`ura.py`](../examples/ura.py) | URA por voz: o cliente diz o motivo e é transferido para o setor certo, com CPF pedido no financeiro |
 
 ## 6. Ligação de verdade pelo Twilio

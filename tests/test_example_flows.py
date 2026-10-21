@@ -225,6 +225,67 @@ def test_examples_only_pass_options_the_sdk_accepts():
     used: set[str] = set()
     for path in Path(__file__).resolve().parents[1].glob("examples/*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "create":
+            func = node.func if isinstance(node, ast.Call) else None
+            if (
+                getattr(func, "attr", "") == "create"
+                and getattr(getattr(func, "value", None), "attr", "") == "sessions"
+            ):
                 used |= {k.arg for k in node.keywords if k.arg}
     assert used and used <= accepted, used - accepted
+
+
+async def test_clinic_answers_ready_made_routes_and_asks_the_ai(monkeypatch):
+    exemplo = _load(monkeypatch, "clinica")
+    transferidos = []
+    perguntas_ia = []
+
+    async def transferir(call_sid, numero):
+        transferidos.append(numero)
+
+    async def responder_com_ia(historico):
+        perguntas_ia.append(historico[-1])
+        return "Atendemos clínica geral, dermatologia e ortopedia."
+
+    monkeypatch.setattr(exemplo, "transferir", transferir)
+    monkeypatch.setattr(exemplo, "responder_com_ia", responder_com_ia)
+    falas = [
+        ("que horas vocês abrem", "question_service", False),
+        ("vocês têm dermatologista", "question_service", False),
+        ("quero marcar uma consulta", "complex", False),
+    ]
+    decisoes = {"que horas vocês abrem": "horario", "quero marcar uma consulta": "agendar"}
+    received = await _run(exemplo, falas, decisoes, {})
+
+    said = _said(received)
+    assert said[0] == exemplo.SAUDACAO
+    assert received[0]["type"] == "ask" and received[0]["calibrate"] is True, "the greeting measures the noise"
+    assert said[1].startswith("Atendemos de segunda a sexta"), "layer 2: a ready-made answer"
+    assert perguntas_ia == [("cliente", "vocês têm dermatologista")], "layer 3: only what is left goes to the AI"
+    assert said[-1] == exemplo.SETORES["agendar"][0]
+    assert transferidos == [exemplo.SETORES["agendar"][1]]
+
+
+async def test_clinic_transfers_when_the_ai_does_not_know(monkeypatch):
+    exemplo = _load(monkeypatch, "clinica")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # without the AI key, open questions go to a person
+    transferidos = []
+
+    async def transferir(call_sid, numero):
+        transferidos.append(numero)
+
+    monkeypatch.setattr(exemplo, "transferir", transferir)
+    received = await _run(exemplo, [("quanto custa a consulta", "question_service", False)], {}, {})
+    assert "[TRANSFERIR]" not in _said(received)[-1]
+    assert transferidos == [exemplo.SETORES["recepcao"][1]]
+
+
+def test_clinic_quality_profiles_only_use_session_options(monkeypatch):
+    """The profiles go to ``sessions.create`` with ``**``, which the check above can't see."""
+    import inspect
+
+    from ermis.client import _Sessions
+
+    exemplo = _load(monkeypatch, "clinica")
+    accepted = set(inspect.signature(_Sessions.create).parameters)
+    for perfil in exemplo.PERFIS.values():
+        assert set(perfil) <= accepted, set(perfil) - accepted

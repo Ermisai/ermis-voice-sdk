@@ -4,6 +4,8 @@
 
 Requer a Ermis Voice API 0.3.0.
 
+- [Tutorial do atendente](docs/tutorial-atendente.md): a configuração de um atendente ou de uma URA, passo a passo (canal, identidade do agente, calibragem de ruído, qualidade e latência, mensagens de espera, as três camadas de resposta, encerramento e transferência). Novo exemplo `clinica.py` com o resultado.
+
 - O fluxo da conversa fica com a Ermis: `call.ask(texto, choices=..., precise=..., slot=...)` faz a pergunta atual (com as respostas esperadas); com `guard` na sessão, a Ermis responde sozinha a fala confusa, a divagação e o assunto fora do tema (`Decision.handled`, `guided_text`). Na `Decision`: `answer` (sim/não com a sua intenção em primeiro lugar), `guidance`, `choice`/`chosen()`.
 - `call.expect_precise()`: a próxima resposta sai do reconhecimento de maior precisão, com a `Decision` já sobre esse texto (para itens do cardápio, tamanhos, quantidades).
 - `Decision.text` (o que o cliente disse, preenchido pelo `Call`) e `Decision.drifting` (divagação: fala longa sem nada do seu negócio). Uma frase longa lida como nome não conta mais como resposta curta.
