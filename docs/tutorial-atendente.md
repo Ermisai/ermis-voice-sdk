@@ -330,7 +330,7 @@ await ermis.sessions.create(..., guard=GUARD)
 | Situação | O que a Ermis faz | Ajuste |
 |---|---|---|
 | Fala confusa | Fala `repeat`. Na segunda seguida, fala `steer` e repete a pergunta atual. Na terceira, fala `give_up` e encerra | `max_unclear` (padrão 3); `"on_give_up": "notify"` só avisa em vez de encerrar |
-| Divagação (o cliente fala muito sem tocar no assunto) | Fala `drift` e repete a pergunta atual | — |
+| Divagação (o cliente fala muito sem tocar no assunto) | Fala `drift` e repete a pergunta atual | `drift` vazio: a divagação chega ao seu código (útil quando a camada 3 conduz uma conversa aberta) |
 | Assunto fora do tema | Fala `off_topic` e repete a pergunta atual | `off_topic` vazio: a fala chega ao seu código (a clínica deixa a camada 3 responder) |
 | Cliente calado | Depois de `no_reply_ms` (padrão 8 s), fala `no_reply` e repete a pergunta. No segundo silêncio seguido, fala `no_reply_give_up` e encerra | `no_reply_ms` (`0` desliga), `max_no_reply`, `"on_no_reply": "notify"` |
 | Ambiente barulhento demais | Com `too_noisy`, fala a frase e encerra depois da calibragem | `too_noisy` |
