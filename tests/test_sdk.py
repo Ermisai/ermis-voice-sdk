@@ -355,6 +355,7 @@ def test_transcription_priority_option():
 
     assert session_body(transcription_priority="latency") == {"transcription_priority": "latency"}
     assert "transcription_priority" not in session_body()
+    assert session_body(precise_wait_ms=0) == {"precise_wait_ms": 0}  # 0 is sent: never wait
 
 
 def test_waiting_options_new_fields():

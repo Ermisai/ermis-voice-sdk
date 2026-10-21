@@ -128,6 +128,7 @@ Base: `https://api.ermis.ai`
 | `auto_decide` | bool | `true` | Cada fala do cliente já vem com o evento `decision` |
 | `partial_transcripts` | bool | `false` | Envia `transcript.partial` com o texto parcial enquanto o cliente ainda fala |
 | `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa), `accuracy` (confere falas duvidosas), `local_first` (a leitura de maior qualidade só nas falas em que o reconhecimento rápido ficou em dúvida) ou `local_only` (só o reconhecimento rápido). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
+| `precise_wait_ms` | inteiro | `500` | Com `latency` e `local_first`: quanto uma resposta marcada como importante (`precise`, `slot`) espera a leitura de maior qualidade, em ms (0 a 3000). `0`: nunca espera |
 | `turn_detection` | string | `smart_turn` | `smart_turn`: um modelo ouve como a fala termina e fecha o turno antes do silêncio completo quando a pessoa terminou; `silence`: só o silêncio de `vad.min_silence_ms` |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
 | `early_turn.speculate` | bool | `false` | Começa a transcrever (e a decidir) já na pausa do cliente, antes de o turno fechar. Se o cliente voltar a falar, esse trabalho é descartado |

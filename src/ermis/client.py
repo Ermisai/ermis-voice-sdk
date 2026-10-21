@@ -96,6 +96,7 @@ class _Sessions:
         auto_decide: bool = UNSET,
         partial_transcripts: bool = UNSET,
         transcription_priority: str = UNSET,
+        precise_wait_ms: int = UNSET,
         turn_detection: str = UNSET,
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
@@ -118,6 +119,10 @@ class _Sessions:
         ``partial_transcripts``: o texto enquanto o cliente ainda fala (eventos ``TranscriptPartial``), para
         mostrar na tela ou adiantar trabalho. Pode mudar até a ``Transcript`` final.
 
+        ``precise_wait_ms`` (Ermis Voice API 0.3.1): com ``transcription_priority`` ``latency`` ou
+        ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
+        maior precisão, em ms (padrão da API: 500; ``0``: nunca espera).
+
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
         ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
@@ -132,6 +137,7 @@ class _Sessions:
             auto_decide=auto_decide,
             partial_transcripts=partial_transcripts,
             transcription_priority=transcription_priority,
+            precise_wait_ms=precise_wait_ms,
             turn_detection=turn_detection,
             early_turn=early_turn,
             custom_intents=custom_intents,

@@ -91,6 +91,7 @@ def session_body(
     auto_decide: bool = UNSET,
     partial_transcripts: bool = UNSET,
     transcription_priority: Literal["balanced", "latency", "accuracy", "local_first", "local_only"] = UNSET,
+    precise_wait_ms: int = UNSET,
     turn_detection: Literal["smart_turn", "silence"] = UNSET,
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
@@ -111,6 +112,7 @@ def session_body(
         "auto_decide": auto_decide,
         "partial_transcripts": partial_transcripts,
         "transcription_priority": transcription_priority,
+        "precise_wait_ms": precise_wait_ms,
         "turn_detection": turn_detection,
         "early_turn": early_turn,
         "custom_intents": custom_intents
