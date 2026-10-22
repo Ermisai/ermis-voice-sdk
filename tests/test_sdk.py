@@ -652,3 +652,15 @@ def test_partial_transcripts_noise_and_revised_slot():
     assert isinstance(noise, NoiseCalibrated) and noise.noisy and noise.samples == 220
     slot = parse_event({"type": "slot", "id": "e1", "value": "a@b.com", "status": "found", "revised": True})
     assert isinstance(slot, SlotResult) and slot.revised and slot.found
+
+
+def test_decision_complex_says_when_your_ai_is_worth_calling():
+    def decision(**fields):
+        return parse_event({"type": "decision", "utterance_id": "u1", **fields})
+
+    assert decision(intent="complex", action="escalate", complexity=0.5).complex()
+    assert decision(intent="complex", action="respond", complexity=0.9).complex()
+    assert not decision(intent="complex", action="respond", complexity=0.9).complex(threshold=1.0)
+    assert not decision(intent="name_provide", action="respond", complexity=0.0).complex()
+    # A goodbye or a request for a person never needs your AI
+    assert not decision(intent="farewell", action="escalate", is_escape=True, complexity=1.5).complex()

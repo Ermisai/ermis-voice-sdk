@@ -173,6 +173,18 @@ class Decision(Event):
             and self.intent in ("question_product", "question_service", "complex", "complaint")
         )
 
+    def complex(self, threshold: float = 0.8) -> bool:
+        """A Ermis avaliou a fala como complexa: ``action == "escalate"`` ou ``complexity`` acima de ``threshold``.
+
+        É o sinal para chamar a sua IA, mas combine com o que o seu roteiro já entendeu: uma fala clara
+        ("uma pizza grande de calabresa") também pode vir assim. Chame a IA quando a fala é complexa **e** o
+        roteiro não resolveu (veja "Quando chamar a sua IA" na documentação). Despedidas e pedidos de atendente
+        (``is_escape``) nunca contam.
+        """
+        if self.is_escape:
+            return False
+        return self.action == "escalate" or (self.complexity or 0.0) >= threshold
+
     @property
     def drifting(self) -> bool:
         if "guidance" in self.raw:

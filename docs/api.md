@@ -233,7 +233,7 @@ A Ermis classifica cada fala em milissegundos. Você usa a decisão para escolhe
 | `intent` | `greeting`, `name_provide`, `name_correction`, `confirm_yes`, `confirm_no`, `farewell`, `thanks`, `wait`, `repeat`, `unclear`, `question_product`, `question_service`, `complaint`, `request_human`, `complex` |
 | `action` | `respond`: dá para responder na hora com uma frase pronta · `escalate`: precisa da sua IA ou de um humano · `clarify`: peça para repetir |
 | `is_escape` | `true` quando o cliente quer desligar ou falar com uma pessoa |
-| `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação) |
+| `complexity` | De 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido de ação). Com `action`, diz quando vale chamar a sua IA: veja [Quando chamar a sua IA](#quando-chamar-a-sua-ia) |
 | `custom_intent` | A chave escolhida entre as suas intenções, ou `other` |
 | `custom_intent_confidence` | De 0 a 1: quanto a escolha de `custom_intent` é segura. Frases truncadas ou fora do assunto que ainda caem numa intenção sua vêm baixas (abaixo de 0,8): trate como `other` |
 | `answer` | `yes`, `no` ou `null`: o sim/não da fala como resposta à última pergunta do agente ("já reiniciei e nada" para "já tentou reiniciar o modem?" é `yes`; "eu não quero calabresa, quero quatro queijos" é mudança de pedido, não um "não") |
@@ -446,6 +446,28 @@ async def falar(call, fala_do_roteiro: str, pergunta: bool, historico: list[str]
 #   decision.off_topic ou decision.drifting  -> falar(call, pergunta_atual, True, historico)
 #   o resto                                  -> o roteiro decide a fala_do_roteiro e chama falar(...)
 ```
+
+### Quando chamar a sua IA
+
+A IA deixa a conversa mais esperta, mas custa tempo (em geral 0,5 a 1,5 s por fala). Chame só quando precisa. Cada `decision` traz a avaliação da Ermis sobre a fala:
+
+- `action`: `respond` (uma frase pronta resolve), `escalate` (precisa da sua IA ou de um humano) ou `clarify` (peça para repetir);
+- `complexity`: de 0 (cumprimento, confirmação) a 2 (problema, reclamação, pedido com vários detalhes).
+
+No SDK, `decision.complex()` junta os dois: `True` quando a Ermis escalou a fala ou a complexidade passa de 0,8 (ajuste com `decision.complex(threshold=...)`). Despedidas e pedidos de atendente nunca contam.
+
+Use esse sinal **junto** com o que o seu roteiro entendeu, não sozinho: uma fala clara também pode vir como complexa (em testes com um agente de pizzaria, cerca de 1 em cada 5 falas veio com `escalate`, inclusive "eu queria uma pizza grande de calabresa"). A regra que funciona bem:
+
+```python
+def precisa_da_ia(decision, entendido_pelo_roteiro) -> bool:
+    if decision.is_escape or decision.unclear:
+        return False                    # despedida, atendente ou fala confusa: o roteiro e o guard resolvem
+    if decision.off_topic or decision.drifting:
+        return True                     # pergunta ou comentário fora do roteiro: a IA responde e volta à pergunta
+    return decision.complex() and not entendido_pelo_roteiro   # complexa e o roteiro não deu conta
+```
+
+Assim as falas simples ("calabresa", "sim", o nome) saem na hora, pelo roteiro, e a IA entra nas que pedem: pedidos com vários itens, correções ("na verdade, troca a calabresa"), palavras que o roteiro não reconhece e perguntas fora do script. Enquanto a IA pensa, envie `thinking` para a Ermis segurar a vez.
 
 Cuidados:
 

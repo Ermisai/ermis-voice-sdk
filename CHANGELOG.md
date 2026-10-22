@@ -5,6 +5,7 @@
 Requer a Ermis Voice API 0.4.0.
 
 - Vozes pelo nome: `ermis.voices.list()` traz as vozes da Ermis ("Alex", "Sarah"…, com gênero e descrição); use o `id` em `sessions.create(voice=...)`. A mesma voz fala em dois níveis, pela prioridade da sessão (`latency`: o mais rápido). `"man"` e `"woman"` continuam aceitos. Exemplos e tutoriais com os nomes novos.
+- `Decision.complex(threshold=0.8)`: a Ermis avaliou a fala como complexa (`action == "escalate"` ou `complexity` alta). Com o que o seu roteiro entendeu, diz quando vale chamar a sua IA; nova seção [Quando chamar a sua IA](docs/api.md#quando-chamar-a-sua-ia).
 - `sessions.create(precise_wait_ms=...)`: com prioridade de latência, quanto as respostas marcadas como importantes (`precise`, `slot`) esperam a leitura de maior precisão. Padrão da API: 0 (não espera; a leitura precisa chega depois, como revisão, e o `slot` revisado vem com `SlotResult.revised`).
 - Documentação: [Conectando a sua IA](docs/api.md#conectando-a-sua-ia), com os dois jeitos de ligar a sua IA (o roteiro conduz e a IA responde os desvios; o roteiro decide e a IA escreve as falas), fallback para a fala do roteiro e `thinking` enquanto a IA escreve.
 
