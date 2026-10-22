@@ -165,7 +165,7 @@ async def lembrar(consulta: Consulta) -> dict[str, str]:
     """O seu sistema chama este endpoint para cada consulta de amanhã."""
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
         custom_intents=RESPOSTAS,  # cada Decision já traz confirmar, cancelar ou remarcar
         turn_detection="smart_turn",
         guard={

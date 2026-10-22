@@ -33,7 +33,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 curl https://api.ermis.ai/v1/voice/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"transport": "twilio", "voice": "woman", "auto_decide": true}'
+  -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
 ```
 
 ```json
@@ -128,7 +128,7 @@ Base: `https://api.ermis.ai`
 | `auto_decide` | bool | `true` | Cada fala do cliente já vem com o evento `decision` |
 | `partial_transcripts` | bool | `false` | Envia `transcript.partial` com o texto parcial enquanto o cliente ainda fala |
 | `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa), `accuracy` (confere falas duvidosas), `local_first` (a leitura de maior qualidade só nas falas em que o reconhecimento rápido ficou em dúvida) ou `local_only` (só o reconhecimento rápido). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
-| `precise_wait_ms` | inteiro | `500` | Com `latency` e `local_first`: quanto uma resposta marcada como importante (`precise`, `slot`) espera a leitura de maior qualidade, em ms (0 a 3000). `0`: nunca espera |
+| `precise_wait_ms` | inteiro | `0` | Com `latency` e `local_first`: quanto uma resposta marcada como importante (`precise`, `slot`) espera a leitura de maior qualidade, em ms (0 a 3000). `0` (padrão): não espera; a leitura precisa chega depois, como revisão. As outras prioridades sempre esperam |
 | `turn_detection` | string | `smart_turn` | `smart_turn`: um modelo ouve como a fala termina e fecha o turno antes do silêncio completo quando a pessoa terminou; `silence`: só o silêncio de `vad.min_silence_ms` |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
 | `early_turn.speculate` | bool | `false` | Começa a transcrever (e a decidir) já na pausa do cliente, antes de o turno fechar. Se o cliente voltar a falar, esse trabalho é descartado |
@@ -147,17 +147,19 @@ Resposta `201`: `session_id`, `audio_url`, `control_url`, `session_token`.
 
 ### Vozes
 
-`GET /v1/voice/voices` lista as vozes que a sua conta pode usar. Use o `id` no campo `voice` ao criar a sessão. No SDK: `await ermis.voices.list()`.
+`GET /v1/voice/voices` lista as vozes que a sua conta pode usar, pelo nome. Use o `id` no campo `voice` ao criar a sessão. No SDK: `await ermis.voices.list()`.
 
 ```json
 {
   "voices": [
-    {"id": "man", "name": "Masculina", "gender": "male", "language": "pt-BR", "description": null, "production": true, "default": true},
-    {"id": "demo", "name": "Demo", "gender": "male", "language": "pt-BR", "description": null, "production": false, "default": false}
+    {"id": "Alex", "name": "Alex", "gender": "male", "language": "pt-BR", "description": "Voz padrão, brasileira natural", "production": true, "default": true},
+    {"id": "Sarah", "name": "Sarah", "gender": "female", "language": "pt-BR", "description": "…", "production": true, "default": false}
   ],
-  "default": "man"
+  "default": "Alex"
 }
 ```
+
+A mesma voz fala em dois níveis, escolhidos pela prioridade da sessão: com `transcription_priority` igual a `latency`, o mais rápido (primeiro áudio em ~50–85 ms); nas demais, o de mais qualidade (~120–210 ms). `man` e `woman`, os nomes de antes (até a API 0.3), continuam aceitos como Alex e Sarah.
 
 Vozes com `production: false` servem só para testes e não devem ser usadas com clientes reais. Sem `voice`, a sessão usa a voz `default`.
 
@@ -302,7 +304,7 @@ Endereços, e-mails e números ditados são onde a transcrição rápida mais er
 {"type": "expect_slot", "id": "e1", "slot": {"name": "endereco", "type": "address", "description": "rua, número e bairro"}}
 ```
 
-Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta. Com prioridade de latência (`latency`, `local_first`), a Ermis espera essa leitura só por um instante (até cerca de meio segundo, o tempo que ela costuma levar); se ela não chegar, o `slot` sai do texto rápido e, se a leitura de maior precisão achar outro valor, chega um segundo `slot` com `revised: true` (no SDK, `SlotResult.revised`). Com `local_only`, o `slot` sai sempre do texto rápido. Ao receber um `slot` revisado, corrija o dado; se o agente já o repetiu para o cliente, diga a correção.
+Quando o cliente responde, a conversa segue no ritmo normal (`transcript` e `decision` chegam como sempre) e, em segundo plano, a Ermis lê a mesma fala com o reconhecimento de maior precisão. Em seguida chega o `slot` com `id` `e1` e o valor extraído desse texto; se a leitura mudou, antes chega `transcript.revised` com a frase corrigida. Use o `slot` para o dado e ignore a `decision` dessa fala, a não ser que seja uma despedida ou uma pergunta. Vale só para a próxima resposta. Com prioridade de latência (`latency`, `local_first`, `local_only`), o `slot` sai na hora, do texto rápido; se a leitura de maior precisão achar outro valor, chega um segundo `slot` com `revised: true` (no SDK, `SlotResult.revised`). Com `precise_wait_ms`, a Ermis espera essa leitura por até esse tempo antes de responder (`local_only` nunca espera). Ao receber um `slot` revisado, corrija o dado; se o agente já o repetiu para o cliente, diga a correção.
 
 No SDK: `valor = await call.expect_slot("endereco", "address")` devolve um `Future`; dê `await valor` na `Decision` da resposta. `TranscriptRevised` traz a frase corrigida.
 
@@ -506,7 +508,7 @@ Os ajustes abaixo são campos da criação da sessão (`POST /v1/voice/sessions`
 
 | Ajuste | Efeito | Custo |
 |---|---|---|
-| `"transcription_priority": "latency"` | A transcrição sai assim que o reconhecimento rápido tem texto, sem esperar a leitura de maior qualidade (cerca de 150 ms a menos por fala). Nas respostas que você marcou como importantes (`precise`, `slot`), a Ermis ainda espera essa leitura por até cerca de meio segundo | Mais erros em nomes, números e frases longas |
+| `"transcription_priority": "latency"` | A transcrição sai assim que o reconhecimento rápido tem texto, sem esperar a leitura de maior qualidade (cerca de 150 ms a menos por fala). Com `precise_wait_ms`, as respostas que você marcou como importantes (`precise`, `slot`) esperam essa leitura por até esse tempo | Mais erros em nomes, números e frases longas |
 | `vad.min_silence_ms` entre `300` e `350` | O turno fecha mais cedo depois que o cliente para de falar | Clientes que fazem pausas no meio da frase são cortados |
 | Respostas prontas para `action: "respond"` | Cumprimentos, agradecimentos e despedidas sem passar pela sua IA | — |
 | Respostas curtas | Menos texto para sintetizar e para o cliente ouvir antes de poder responder | — |

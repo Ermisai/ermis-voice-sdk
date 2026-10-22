@@ -465,7 +465,7 @@ async def voz() -> Response:
     """Webhook do Twilio: cria a sessão e manda o áudio da ligação direto para o Ermis Voice."""
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="man",
+        voice="Alex",
         custom_intents=INTENCOES,  # cada decisão já diz qual delas o cliente quis
         vocabulary=VOCABULARIO,  # o texto já chega com os sabores escritos certo
         # O fluxo fica com o Ermis Voice: fala confusa, divagação e fora do tema, com as frases da pizzaria

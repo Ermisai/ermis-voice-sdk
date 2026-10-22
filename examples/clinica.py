@@ -49,7 +49,7 @@ _conversas: set[asyncio.Task] = set()
 # ── Passo 3: identidade do agente ───────────────────────────────────────────
 NOME_AGENTE = "Lia"
 EMPRESA = "Clínica Bem Estar"
-VOZ = "woman"  # um id de `await ermis.voices.list()` com production=True
+VOZ = "Sarah"  # um id de `await ermis.voices.list()` com production=True
 SAUDACAO = f"Olá! Você ligou para a {EMPRESA}, aqui é a {NOME_AGENTE}. Como posso ajudar?"
 DESPEDIDA = "Obrigada pela ligação. Até logo!"
 MAIS_ALGO = "Posso ajudar em mais alguma coisa?"

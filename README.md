@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Prévia (0.3.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
+> **Prévia (0.4.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 

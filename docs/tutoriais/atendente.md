@@ -154,7 +154,7 @@ for voz in await ermis.voices.list():
 Use o `id` na sessão. Escolha uma voz que combine com o nome: uma voz feminina para a "Lia". Sem `voice`, a sessão usa a voz padrão da conta.
 
 ```python
-VOZ = "woman"
+VOZ = "Sarah"
 
 await ermis.sessions.create(..., voice=VOZ, language="pt-BR")
 ```

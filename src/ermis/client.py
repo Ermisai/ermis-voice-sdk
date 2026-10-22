@@ -119,9 +119,9 @@ class _Sessions:
         ``partial_transcripts``: o texto enquanto o cliente ainda fala (eventos ``TranscriptPartial``), para
         mostrar na tela ou adiantar trabalho. Pode mudar até a ``Transcript`` final.
 
-        ``precise_wait_ms`` (Ermis Voice API 0.3.1): com ``transcription_priority`` ``latency`` ou
+        ``precise_wait_ms`` (Ermis Voice API 0.4.0): com ``transcription_priority`` ``latency`` ou
         ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
-        maior precisão, em ms (padrão da API: 500; ``0``: nunca espera).
+        maior precisão, em ms (padrão da API: 0, não espera).
 
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:

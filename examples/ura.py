@@ -147,7 +147,7 @@ async def _rodar(session, call_sid: str) -> None:
 async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 (nome do campo do Twilio)
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
         transcription_priority="latency",  # numa URA, responder rápido importa mais que cada palavra
         custom_intents=SETORES,  # cada Decision já traz o setor em custom_intent
         metadata={"call_sid": CallSid, "fluxo": "ura"},

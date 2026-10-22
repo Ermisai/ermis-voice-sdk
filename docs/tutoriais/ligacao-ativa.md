@@ -35,7 +35,7 @@ A única diferença técnica para uma ligação recebida é quem começa. Em vez
 ```python
 @app.post("/lembretes")
 async def lembrar(consulta: Consulta) -> dict[str, str]:
-    session = await ermis.sessions.create(transport="twilio", voice="woman", ...)
+    session = await ermis.sessions.create(transport="twilio", voice="Sarah", ...)
     asyncio.create_task(_rodar(session, consulta))      # a conversa espera o paciente atender
     await discar(consulta.telefone, session.twiml())
     return {"session_id": session.session_id}

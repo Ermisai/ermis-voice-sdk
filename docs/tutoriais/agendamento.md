@@ -37,7 +37,7 @@ Na sessão:
 ```python
 session = await ermis.sessions.create(
     transport="twilio",
-    voice="woman",
+    voice="Sarah",
     custom_intents=PEDIDOS,               # cada Decision já traz marcar, remarcar ou cancelar
     vad={"min_silence_ms": 600},          # datas e telefones ditados têm pausas
     waiting=WaitingOptions(filler_after_ms=900),

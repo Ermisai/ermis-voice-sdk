@@ -48,7 +48,7 @@ from .events import (
 from .options import BargeInOptions, VadOptions, WaitingOptions
 from .speech_text import normalize_for_speech, number_to_words
 
-__version__ = "0.3.0a1"
+__version__ = "0.4.0a1"
 
 __all__ = [
     "APIError",

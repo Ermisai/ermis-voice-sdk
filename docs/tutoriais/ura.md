@@ -72,7 +72,7 @@ Numa URA, a resposta do cliente é curta e o agente só precisa do setor. Respon
 ```python
 session = await ermis.sessions.create(
     transport="twilio",
-    voice="woman",
+    voice="Sarah",
     transcription_priority="latency",   # o texto sai assim que o reconhecimento rápido termina
     custom_intents=SETORES,             # cada Decision já traz o setor em custom_intent
     metadata={"call_sid": CallSid, "fluxo": "ura"},

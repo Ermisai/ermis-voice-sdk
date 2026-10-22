@@ -215,7 +215,7 @@ async def _rodar(session) -> None:
 async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 (nome do campo do Twilio)
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
         custom_intents=PEDIDOS,  # cada Decision já traz marcar, remarcar ou cancelar em custom_intent
         # Datas e telefones ditados têm pausas: um pouco mais de silêncio antes de fechar o turno
         vad={"min_silence_ms": 600},
