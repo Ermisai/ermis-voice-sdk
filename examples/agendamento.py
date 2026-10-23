@@ -1,8 +1,9 @@
 """Atendente de agendamento de consultas por telefone (Twilio), usando o SDK da Ermis.
 
-O agente marca, remarca ou cancela uma consulta: entende o pedido com ``decide()`` e
-intenções do seu negócio, oferece os horários livres, extrai o nome e o telefone ditados
-com ``extract_slot()`` e confirma tudo antes de gravar.
+O agente marca, remarca ou cancela uma consulta. As intenções do negócio vão na sessão
+(``custom_intents``) e cada ``Decision`` já traz a escolhida; os horários livres viram as intenções
+da etapa com ``set_custom_intents()``. O nome sai de ``extract_slot()`` e o telefone de
+``expect_slot()``, lido também pelo reconhecimento de maior precisão. Tudo é confirmado antes de gravar.
 
 Rodar:
     pip install ermis-voice fastapi uvicorn python-multipart
@@ -88,6 +89,7 @@ async def conduzir(call: Call) -> None:
     etapa = "pedido"  # pedido -> dia -> hora -> nome -> telefone -> confirmar
     falas: dict[str, str] = {}
     encerrando = False
+    telefone_esperado = None  # o valor pedido com expect_slot
 
     async def falar(texto: str, **opcoes) -> None:
         await call.speak(texto, **opcoes)
@@ -118,10 +120,14 @@ async def conduzir(call: Call) -> None:
                     await despedir()
                 continue
 
+            if event.unclear:  # fala confusa: pede para repetir em vez de agir num palpite
+                await falar("Desculpe, não entendi. Pode repetir?")
+                continue
+
             if etapa == "pedido":
-                escolha = await call.decide(texto, custom_intents=PEDIDOS)
-                if escolha.custom_intent in ("marcar", "remarcar", "cancelar"):
-                    pedido.tipo = escolha.custom_intent
+                escolha = event.business_intent()  # as intenções da sessão já vêm decididas
+                if escolha in ("marcar", "remarcar", "cancelar"):
+                    pedido.tipo = escolha
                     if pedido.tipo == "cancelar":
                         etapa = "nome"
                         await falar("Certo. Qual é o nome do paciente?")
@@ -141,15 +147,16 @@ async def conduzir(call: Call) -> None:
                 pedido.opcoes = await horarios_livres(pedido.dia)
                 nomes = ", ".join(o.label for o in pedido.opcoes[:-1]) + f" ou {pedido.opcoes[-1].label}"
                 etapa = "hora"
+                await call.set_custom_intents(pedido.opcoes)  # a próxima Decision escolhe entre os horários
                 await falar(f"Para {pedido.dia} eu tenho {nomes}. Qual prefere?")
 
             elif etapa == "hora":
-                hora = await call.decide(texto, custom_intents=pedido.opcoes)
-                opcao = next((o for o in pedido.opcoes if o.key == hora.custom_intent), None)
+                opcao = next((o for o in pedido.opcoes if o.key == event.business_intent()), None)
                 if opcao is None:
                     await falar("Desculpe, qual desses horários você prefere?")
                     continue
                 pedido.hora, pedido.hora_falada = opcao.key, opcao.label
+                await call.set_custom_intents(PEDIDOS)
                 etapa = "nome"
                 await falar("Perfeito. Qual é o nome do paciente?")
 
@@ -161,9 +168,15 @@ async def conduzir(call: Call) -> None:
                 pedido.nome = nome.value
                 etapa = "telefone"
                 await falar(f"Obrigada, {pedido.nome}. E um telefone para contato?")
+                telefone_esperado = await call.expect_slot("telefone", "phone")
 
             elif etapa == "telefone":
-                telefone = await call.extract_slot(texto, "telefone", "phone")
+                telefone = (
+                    await telefone_esperado
+                    if telefone_esperado
+                    else await call.extract_slot(texto, "telefone", "phone")
+                )
+                telefone_esperado = None
                 if not telefone.found:
                     await falar("Não entendi o número. Pode dizer devagar, com o DDD?")
                     continue
@@ -202,7 +215,8 @@ async def _rodar(session) -> None:
 async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 (nome do campo do Twilio)
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
+        custom_intents=PEDIDOS,  # cada Decision já traz marcar, remarcar ou cancelar em custom_intent
         # Datas e telefones ditados têm pausas: um pouco mais de silêncio antes de fechar o turno
         vad={"min_silence_ms": 600},
         waiting=WaitingOptions(filler_after_ms=900),

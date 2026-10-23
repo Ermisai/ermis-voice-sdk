@@ -131,7 +131,7 @@ async def _rodar(session) -> None:
 async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 (nome do campo do Twilio)
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
         auto_decide=True,
         max_duration_s=900,
         waiting=ESPERA,

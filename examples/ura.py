@@ -1,8 +1,9 @@
 """URA por voz (Twilio): o cliente diz o motivo da ligação e é encaminhado para o setor certo.
 
 Em vez de "digite 1 para financeiro", o cliente fala do jeito dele ("quero a segunda via",
-"minha internet caiu") e ``decide()`` escolhe o setor entre as intenções do seu negócio.
-Para o financeiro, o agente pede o CPF antes de transferir.
+"minha internet caiu"): os setores vão na sessão (``custom_intents``) e cada ``Decision`` já traz o
+setor escolhido, sem chamada extra. Para o financeiro, o agente pede o CPF com ``expect_slot()``: a Ermis
+lê a resposta também com o reconhecimento de maior precisão. Fala confusa (``event.unclear``) pede repetição.
 
 Rodar:
     pip install ermis-voice fastapi uvicorn python-multipart
@@ -70,6 +71,7 @@ async def conduzir(call: Call, call_sid: str = "") -> None:
     falas: dict[str, str] = {}
     tentativas = 0
     etapa = "motivo"  # motivo -> cpf (só financeiro)
+    cpf_esperado = None  # o valor pedido com expect_slot
     destino: str | None = None
     dados: dict[str, str] = {}
 
@@ -100,17 +102,24 @@ async def conduzir(call: Call, call_sid: str = "") -> None:
                     await call.speak("Tudo bem. Obrigado pela ligação!", allow_barge_in=False)
                 continue
 
+            if event.unclear:  # fala confusa: pede para repetir em vez de agir num palpite
+                await call.speak("Desculpe, não entendi. Pode repetir?")
+                continue
+
             if etapa == "cpf":
-                cpf = await call.extract_slot(texto, "cpf", "cpf")
+                # O CPF pedido com expect_slot: a Ermis lê a resposta também com o reconhecimento preciso
+                cpf = await cpf_esperado if cpf_esperado else await call.extract_slot(texto, "cpf", "cpf")
+                cpf_esperado = None
                 if cpf.found:
                     dados["cpf"] = cpf.value
                 await encaminhar("financeiro")  # com ou sem CPF: o financeiro confirma
                 continue
 
-            setor = (await call.decide(texto, custom_intents=SETORES)).custom_intent
+            setor = event.business_intent()  # as intenções da sessão já vêm decididas, sem chamada extra
             if setor == "financeiro":
                 etapa = "cpf"
                 await call.speak("Para agilizar, qual é o CPF do titular?")
+                cpf_esperado = await call.expect_slot("cpf", "cpf")
             elif setor in ("suporte", "vendas"):
                 await encaminhar(setor)
             else:
@@ -138,8 +147,9 @@ async def _rodar(session, call_sid: str) -> None:
 async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 (nome do campo do Twilio)
     session = await ermis.sessions.create(
         transport="twilio",
-        voice="woman",
+        voice="Sarah",
         transcription_priority="latency",  # numa URA, responder rápido importa mais que cada palavra
+        custom_intents=SETORES,  # cada Decision já traz o setor em custom_intent
         metadata={"call_sid": CallSid, "fluxo": "ura"},
     )
     tarefa = asyncio.create_task(_rodar(session, CallSid))

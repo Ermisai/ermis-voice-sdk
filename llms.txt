@@ -1,14 +1,17 @@
 # Ermis Voice SDK para Python
 
-> SDK Python (pacote `ermis-voice`, importado como `ermis`) da Ermis Voice API: um agente de voz em tempo real para ligações por telefone (Twilio), navegador ou WebSocket. A API detecta a fala, transcreve, classifica a intenção, fala com voz natural e para quando o cliente interrompe; o seu servidor recebe eventos (`Transcript`, `Decision`) e responde com comandos (`speak`, `decide`, `extract_slot`, `end`). Em prévia (0.2.0a1): nomes e campos podem mudar.
+> SDK Python (pacote `ermis-voice`, importado como `ermis`) da Ermis Voice API: um agente de voz em tempo real para ligações por telefone (Twilio), navegador ou WebSocket. A API detecta a fala, transcreve, classifica a intenção, fala com voz natural e para quando o cliente interrompe; o seu servidor recebe eventos (`Transcript`, `Decision`) e responde com comandos (`speak`, `extract_slot`, `expect_slot`, `end`). As intenções do negócio vão na sessão (`custom_intents`) e cada `Decision` já traz a escolhida; `vocabulary` corrige palavras do negócio na transcrição; `expect_slot` lê dados importantes com o reconhecimento de maior precisão; `Decision.unclear` e `Decision.off_topic` tratam fala confusa e fora do assunto; `Decision.complex()` (a Ermis escalou a fala ou a complexidade é alta), junto com o que o seu roteiro entendeu, diz quando chamar a sua IA; o texto falado é normalizado automaticamente (números, valores, e-mails). Em prévia (0.4.0a1): nomes e campos podem mudar.
 
 Use somente as classes e os métodos documentados nos links abaixo. A chave (`ERMIS_API_KEY`) fica só no servidor; a URL da API vem de `ERMIS_API_URL`. Respostas do agente são faladas: curtas, sem markdown.
 
 ## Documentação
 
 - [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md): da instalação a um número de telefone atendido pelo agente, com o laço de eventos e a lista de conferência para produção
+- [Tutoriais](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/README.md): um agente completo por cenário, e as três camadas de resposta (`guard`, respostas pré-definidas, a IA externa do cliente)
+- [Tutorial do atendente](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md): Twilio ou navegador, nome e voz do agente, calibragem de ruído (`calibrate`, `NoiseCalibrated`), perfis de qualidade e latência, `guard`, respostas pré-definidas com `custom_intents` e a IA do cliente na camada 3
+- Tutoriais por cenário: [URA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ura.md), [agendamento](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/agendamento.md), [pedidos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/pedidos.md), [assistente com IA e ferramentas](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/assistente-ia.md), [ligação ativa](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/ligacao-ativa.md)
 - [README e referência do SDK](https://github.com/Ermisai/ermis-voice-sdk/blob/main/README.md): `Ermis`, `Session`, `Call`, eventos, opções e exceções
-- [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, áudio e erros
+- [Referência da Voice API](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md): protocolo HTTP e WebSocket, decisões, extração de dados, mensagens de espera, como ligar a sua IA (o roteiro decide, a IA escreve), áudio e erros
 - [Prompt para assistentes de IA](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/prompt-para-ia.md): prompt completo para gerar um agente com testes
 
 ## Exemplos
@@ -17,6 +20,10 @@ Use somente as classes e os métodos documentados nos links abaixo. A chave (`ER
 - [atendente_twilio.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py): atendente geral pelo Twilio
 - [agendamento.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py): marcar, remarcar e cancelar consultas
 - [ura.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/ura.py): URA por voz com transferência por setor
+- [clinica.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/clinica.py): o resultado do tutorial, com respostas em três camadas (`guard`, respostas prontas e URA, IA)
+- [assistente_ia.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/assistente_ia.py): suporte técnico conduzido pela IA do cliente, com ferramentas que consultam o sistema
+- [confirmacao.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/confirmacao.py): ligação ativa pelo Twilio, que confirma uma consulta e registra o resultado
+- [pizzaria.py](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/pizzaria.py): pedidos de pizza por objetivos, com vocabulário do cardápio, endereço lido pelo reconhecimento preciso, dúvidas e fala fora do assunto
 
 ## Opcional
 

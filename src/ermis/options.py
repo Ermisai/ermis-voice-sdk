@@ -6,7 +6,7 @@ usa o padrão documentado.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Any, Literal
 
 
@@ -89,7 +89,14 @@ def session_body(
     language: str = UNSET,
     voice: str = UNSET,
     auto_decide: bool = UNSET,
-    transcription_priority: Literal["balanced", "latency", "accuracy"] = UNSET,
+    partial_transcripts: bool = UNSET,
+    transcription_priority: Literal["balanced", "latency", "accuracy", "local_first", "local_only"] = UNSET,
+    precise_wait_ms: int = UNSET,
+    turn_detection: Literal["smart_turn", "silence"] = UNSET,
+    early_turn: dict[str, Any] = UNSET,
+    custom_intents: list[Any] = UNSET,
+    vocabulary: list[str] = UNSET,
+    guard: dict[str, Any] = UNSET,
     vad: VadOptions | dict[str, Any] = UNSET,
     barge_in: BargeInOptions | dict[str, Any] = UNSET,
     waiting: WaitingOptions | dict[str, Any] = UNSET,
@@ -103,7 +110,16 @@ def session_body(
         "language": language,
         "voice": voice,
         "auto_decide": auto_decide,
+        "partial_transcripts": partial_transcripts,
         "transcription_priority": transcription_priority,
+        "precise_wait_ms": precise_wait_ms,
+        "turn_detection": turn_detection,
+        "early_turn": early_turn,
+        "custom_intents": custom_intents
+        if custom_intents is UNSET
+        else [i if isinstance(i, dict) else asdict(i) for i in custom_intents],
+        "vocabulary": vocabulary,
+        "guard": guard,
         "vad": vad,
         "barge_in": barge_in,
         "waiting": waiting,

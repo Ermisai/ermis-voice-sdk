@@ -7,19 +7,31 @@ import contextlib
 import json
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed
 
 from .errors import ConnectionClosedError, ErmisError, InvalidRequestError, from_close_code
-from .events import Audio, BargeIn, Decision, ErrorEvent, Event, SessionEnded, SlotResult, SpeakDone, parse_event
+from .events import (
+    Audio,
+    BargeIn,
+    Decision,
+    ErrorEvent,
+    Event,
+    SessionEnded,
+    SlotResult,
+    SpeakDone,
+    Transcript,
+    parse_event,
+)
+from .speech_text import normalize_for_speech
 
 
 @dataclass(frozen=True)
 class CustomIntent:
-    """Uma intenção do seu negócio para ``Call.decide()``."""
+    """Uma intenção do seu negócio: em ``sessions.create(custom_intents=...)`` ou ``Call.decide()``."""
 
     key: str
     label: str
@@ -31,6 +43,16 @@ def _new_id(prefix: str) -> str:
 
 
 _END = object()
+
+
+@dataclass(frozen=True)
+class Question:
+    """Uma pergunta feita com ``Call.ask()``."""
+
+    id: str
+    text: str
+    value: asyncio.Future[SlotResult] | None = None
+    """Com ``slot``: o valor da resposta (``await question.value``)."""
 
 
 class Call:
@@ -50,11 +72,13 @@ class Call:
     desses métodos e não aparecem na iteração.
     """
 
-    def __init__(self, ws: ClientConnection) -> None:
+    def __init__(self, ws: ClientConnection, *, normalize_text: bool = True) -> None:
         self._ws = ws
+        self.normalize_text = normalize_text
         self._events: asyncio.Queue[Any] = asyncio.Queue()
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._speaking: dict[str, asyncio.Future[bool]] = {}
+        self._texts: dict[str, str] = {}  # texto de cada fala, para Decision.text
         self._reader: asyncio.Task[None] | None = None
         self.session_id: str | None = None
         self.ended: SessionEnded | None = None
@@ -100,6 +124,11 @@ class Call:
                     self._events.put_nowait(Audio("audio", {}, data=raw))
                     continue
                 event = parse_event(json.loads(raw))
+                if isinstance(event, Transcript):
+                    self._texts[event.utterance_id] = event.text
+                elif isinstance(event, Decision) and event.utterance_id and not event.text:
+                    # A Decision chega sem o texto; o Call junta o da Transcript da mesma fala
+                    event = replace(event, text=self._texts.get(event.utterance_id, ""))
                 if self._route(event):
                     continue
                 self._events.put_nowait(event)
@@ -161,12 +190,17 @@ class Call:
         voice: str | None = None,
         allow_barge_in: bool | None = None,
         calibrate: bool | None = None,
+        normalize: bool | None = None,
     ) -> str:
         """O agente fala ``text``. Devolve o ``id`` da fala na hora, sem esperar o áudio terminar.
 
         - ``calibrate=True`` na saudação: a Ermis mede o ruído de fundo enquanto o cliente escuta.
         - ``allow_barge_in=False`` para avisos que não podem ser interrompidos.
+        - ``normalize``: escreve o texto do jeito que se fala ("R$ 49,90" -> "quarenta e nove reais e noventa
+          centavos"); padrão do ``connect(..., normalize_text=True)``.
         """
+        if self.normalize_text if normalize is None else normalize:
+            text = normalize_for_speech(text)
         speak_id = id or _new_id("r")
         msg: dict[str, Any] = {"type": "speak", "id": speak_id, "text": text}
         for key, value in (("voice", voice), ("allow_barge_in", allow_barge_in), ("calibrate", calibrate)):
@@ -231,6 +265,19 @@ class Call:
             msg["timeout_ms"] = timeout_ms
         await self.send(msg)
 
+    async def set_vocabulary(self, vocabulary: list[str]) -> None:
+        """Troca o vocabulário das próximas falas (``[]`` desliga)."""
+        await self.send({"type": "set_vocabulary", "vocabulary": list(vocabulary)})
+
+    async def set_custom_intents(self, custom_intents: list[CustomIntent | dict[str, Any]]) -> None:
+        """Troca as intenções avaliadas nas próximas decisões automáticas (``[]`` desliga)."""
+        await self.send(
+            {
+                "type": "set_custom_intents",
+                "custom_intents": [asdict(i) if isinstance(i, CustomIntent) else i for i in custom_intents],
+            }
+        )
+
     async def done_processing(self) -> None:
         """Você decidiu não responder esta fala. O agente volta a ouvir."""
         await self.send({"type": "done_processing"})
@@ -248,6 +295,81 @@ class Call:
     async def playback_finished(self, speak_id: str) -> None:
         """Avisa que o áudio de ``speak_id`` terminou de tocar do seu lado. Só no transporte ``websocket``."""
         await self.send({"type": "playback_finished", "id": speak_id})
+
+    async def ask(
+        self,
+        text: str,
+        *,
+        choices: list[CustomIntent | dict[str, Any]] | None = None,
+        precise: bool = False,
+        slot: tuple[str, str] | dict[str, Any] | None = None,
+        **options: Any,
+    ) -> Question:
+        """Faz uma pergunta: fala ``text`` e ela vira a pergunta atual da ligação.
+
+        Com o ``guard`` da sessão, a Ermis repete essa pergunta depois de uma fala confusa, de uma divagação
+        ou de um assunto fora do tema. ``choices``: as respostas esperadas (``CustomIntent(key, label,
+        description)``); a ``Decision`` da resposta traz ``choice``, mesmo com a fala mal transcrita ou dita
+        de outro jeito. ``precise``: a resposta sai do reconhecimento de maior precisão. ``slot``: o dado da
+        resposta, como em ``expect_slot`` (``("endereco", "address")``); o valor chega em ``Question.value``.
+        """
+        if self.ended is not None:
+            raise ConnectionClosedError("a sessão já terminou")
+        if self.normalize_text if options.pop("normalize", None) is None else options["normalize"]:
+            text = normalize_for_speech(text)
+        ask_id = options.pop("id", None) or _new_id("q")
+        msg: dict[str, Any] = {"type": "ask", "id": ask_id, "text": text}
+        for key, value in options.items():
+            if value is not None:
+                msg[key] = value
+        if choices:
+            msg["choices"] = [asdict(c) if isinstance(c, CustomIntent) else c for c in choices]
+        if precise:
+            msg["precise"] = True
+        value: asyncio.Future[SlotResult] | None = None
+        if slot:
+            name, kind = (slot["name"], slot.get("type", "text")) if isinstance(slot, dict) else slot
+            msg["slot"] = {**(slot if isinstance(slot, dict) else {}), "name": name, "type": kind}
+            value = asyncio.get_running_loop().create_future()
+            self._pending[ask_id] = value  # the slot of the answer comes with the id of the question
+        await self.send(msg)
+        return Question(ask_id, text, value)
+
+    async def expect_precise(self) -> None:
+        """A próxima resposta precisa ser exata (um item do cardápio, um tamanho, uma quantidade).
+
+        A ``Transcript`` e a ``Decision`` dessa fala saem do reconhecimento de maior precisão: leva alguns
+        décimos de segundo a mais, só nessa fala. Chame logo depois do ``speak`` da pergunta. Para um dado
+        que pode chegar depois (endereço, e-mail), prefira ``expect_slot()``, que não atrasa a conversa.
+        """
+        await self.send({"type": "expect_precise"})
+
+    async def expect_slot(
+        self, name: str, type: str = "text", *, description: str | None = None
+    ) -> asyncio.Future[SlotResult]:
+        """Avisa que a próxima resposta do cliente traz um dado (endereço, e-mail, CPF...).
+
+        A Ermis lê essa resposta também com o reconhecimento de maior precisão, em segundo plano, e o valor
+        chega no ``Future`` devolvido (``await`` quando precisar dele). A conversa segue no ritmo normal:
+        ``Transcript`` e ``Decision`` dessa fala chegam como sempre, e ``TranscriptRevised`` se a leitura
+        precisa mudou o texto::
+
+            await call.speak("Pra qual endereço eu mando?")
+            endereco = await call.expect_slot("endereco", "address")
+            ...
+            # na Decision da resposta:
+            resultado = await endereco
+        """
+        if self.ended is not None:
+            raise ConnectionClosedError("a sessão já terminou")
+        slot: dict[str, Any] = {"name": name, "type": type}
+        if description:
+            slot["description"] = description
+        req_id = _new_id("e")
+        fut: asyncio.Future[SlotResult] = asyncio.get_running_loop().create_future()
+        self._pending[req_id] = fut
+        await self.send({"type": "expect_slot", "id": req_id, "slot": slot})
+        return fut
 
     async def _request(self, prefix: str, msg: dict[str, Any], timeout: float) -> Any:
         if self.ended is not None:

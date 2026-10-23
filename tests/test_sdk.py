@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from xml.etree import ElementTree
 
 import httpx
@@ -27,7 +28,9 @@ from ermis import (
     SessionEnded,
     SessionStarted,
     Transcript,
+    TranscriptRevised,
     UnknownEvent,
+    Voice,
     WaitingOptions,
     parse_event,
 )
@@ -75,6 +78,35 @@ async def test_create_session_sends_only_given_fields():
     assert ermis.sandbox
 
 
+async def test_session_turn_options_and_custom_intents():
+    seen: list[dict] = []
+
+    def api(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(201, json=SESSION)
+
+    ermis = _client(api)
+    await ermis.sessions.create(
+        transcription_priority="local_first",
+        turn_detection="smart_turn",
+        early_turn={"speculate": True, "close_on_complete_text": True},
+        custom_intents=[CustomIntent("pedir_pizza", "Pede pizza", "tamanho e sabor"), {"key": "outro_assunto"}],
+        vocabulary=["margherita", "calabresa"],
+        guard={"enabled": True, "off_topic": ""},
+    )
+    assert seen[0] == {
+        "transcription_priority": "local_first",
+        "turn_detection": "smart_turn",
+        "early_turn": {"speculate": True, "close_on_complete_text": True},
+        "custom_intents": [
+            {"key": "pedir_pizza", "label": "Pede pizza", "description": "tamanho e sabor"},
+            {"key": "outro_assunto"},
+        ],
+        "vocabulary": ["margherita", "calabresa"],
+        "guard": {"enabled": True, "off_topic": ""},
+    }
+
+
 async def test_twiml_is_valid_xml_with_escaped_token():
     ermis = _client(lambda r: httpx.Response(201, json=SESSION))
     session = await ermis.sessions.create(transport="twilio")
@@ -114,6 +146,32 @@ async def test_usage_and_balance():
     ermis = _client(api)
     assert (await ermis.usage(limit=25, before=123))["entries"] == []
     assert (await ermis.balance())["available_credits"] == 900
+
+
+async def test_list_voices_and_use_one():
+    sent = []
+
+    def api(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/voice/voices":
+            return httpx.Response(
+                200,
+                json={
+                    "voices": [
+                        {"id": "man", "name": "Masculina", "gender": "male", "production": True, "default": True},
+                        {"id": "demo", "name": "Demo", "production": False},
+                    ],
+                    "default": "man",
+                },
+            )
+        sent.append(json.loads(request.content))
+        return httpx.Response(201, json=SESSION)
+
+    ermis = _client(api)
+    voices = await ermis.voices.list()
+    assert voices[0] == Voice(id="man", name="Masculina", gender="male", default=True)
+    assert [v.id for v in voices if v.production] == ["man"]
+    await ermis.sessions.create(voice=voices[1].id)
+    assert sent == [{"voice": "demo"}]
 
 
 async def test_usage_default_pagination():
@@ -297,6 +355,7 @@ def test_transcription_priority_option():
 
     assert session_body(transcription_priority="latency") == {"transcription_priority": "latency"}
     assert "transcription_priority" not in session_body()
+    assert session_body(precise_wait_ms=0) == {"precise_wait_ms": 0}  # 0 is sent: never wait
 
 
 def test_waiting_options_new_fields():
@@ -304,3 +363,304 @@ def test_waiting_options_new_fields():
 
     opts = WaitingOptions(filler_by_intent={"complaint": ["Sinto muito."]}, gap_after_ms=None)
     assert opts.to_dict() == {"filler_by_intent": {"complaint": ["Sinto muito."]}, "gap_after_ms": None}
+
+
+async def test_set_custom_intents_command():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        received.append(json.loads(await ws.recv()))
+        received.append(json.loads(await ws.recv()))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    await call.set_custom_intents([CustomIntent("financeiro", "Financeiro")])
+                    await call.set_custom_intents([])
+
+    await _with_server(handler, body)
+    assert received == [
+        {
+            "type": "set_custom_intents",
+            "custom_intents": [{"key": "financeiro", "label": "Financeiro", "description": ""}],
+        },
+        {"type": "set_custom_intents", "custom_intents": []},
+    ]
+
+
+async def test_speech_is_normalized_unless_turned_off():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        for _ in range(4):
+            received.append(json.loads(await ws.recv()))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "transcript",
+                    "utterance_id": "u1",
+                    "text": "uma margherita",
+                    "assessment": {},
+                    "corrections": [{"heard": "marquerita", "term": "margherita", "score": 0.89}],
+                }
+            )
+        )
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        seen = []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                seen.append(event)
+                if isinstance(event, SessionStarted):
+                    await call.speak("**Fica R$ 49,90** 🍕")
+                    await call.speak("R$ 49,90", normalize=False)
+                    await call.set_vocabulary(["margherita"])
+                    call.normalize_text = False
+                    await call.speak("2 pizzas")
+        return seen
+
+    seen = await _with_server(handler, body)
+    assert received[0]["text"] == "Fica quarenta e nove reais e noventa centavos"
+    assert received[1]["text"] == "R$ 49,90"
+    assert received[2] == {"type": "set_vocabulary", "vocabulary": ["margherita"]}
+    assert received[3]["text"] == "2 pizzas"
+    transcript = next(e for e in seen if isinstance(e, Transcript))
+    assert transcript.corrections == [{"heard": "marquerita", "term": "margherita", "score": 0.89}]
+
+
+async def test_expect_slot_value_arrives_after_the_decision():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        expect = json.loads(await ws.recv())
+        received.append(expect)
+        await ws.send(
+            json.dumps({"type": "transcript", "utterance_id": "u1", "text": "rodas flores dez", "assessment": {}})
+        )
+        await ws.send(json.dumps({"type": "decision", "utterance_id": "u1", "intent": "complex", "action": "escalate"}))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "transcript.revised",
+                    "utterance_id": "u1",
+                    "text": "Rua das Flores, 10",
+                    "previous": "rodas flores dez",
+                }
+            )
+        )
+        await ws.send(
+            json.dumps({"type": "slot", "id": expect["id"], "value": "Rua das Flores, 10", "status": "found"})
+        )
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        seen, values = [], []
+        async with ermis.connect(url) as call:
+            expected = None
+            async for event in call:
+                seen.append(event)
+                if isinstance(event, SessionStarted):
+                    expected = await call.expect_slot("endereco", "address", description="rua e número")
+                elif isinstance(event, Decision):
+                    values.append(await expected)
+        return seen, values
+
+    seen, values = await _with_server(handler, body)
+    assert received[0]["type"] == "expect_slot"
+    assert received[0]["slot"] == {"name": "endereco", "type": "address", "description": "rua e número"}
+    assert values[0].found and values[0].value == "Rua das Flores, 10"
+    revised = next(e for e in seen if isinstance(e, TranscriptRevised))
+    assert revised.text == "Rua das Flores, 10" and revised.previous == "rodas flores dez"
+
+
+def test_decision_tells_unclear_and_off_topic_speech():
+    def decision(**fields):
+        return parse_event({"type": "decision", "utterance_id": "u1", **fields})
+
+    # "eu queria saber se vai xouver o janeite": garbled, a weak pick of a business intent
+    garbled = decision(
+        intent="question_service", action="clarify", custom_intent="cardapio", custom_intent_confidence=0.67
+    )
+    assert garbled.unclear and garbled.business_intent() == "other" and not garbled.off_topic
+    # Valid short answers also come with clarify
+    assert not decision(
+        intent="name_provide", action="clarify", custom_intent="pedir", custom_intent_confidence=0.92
+    ).unclear
+    assert not decision(
+        intent="farewell", action="clarify", custom_intent="other", custom_intent_confidence=0.92
+    ).unclear
+    off = decision(intent="question_product", action="escalate", custom_intent="other", custom_intent_confidence=0.98)
+    assert off.off_topic and not off.unclear
+    sure = decision(intent="complex", action="escalate", custom_intent="pedir", custom_intent_confidence=1.0)
+    assert sure.business_intent() == "pedir" and not sure.off_topic
+
+
+def test_decision_tells_drifting_speech():
+    def decision(text, **fields):
+        return replace(parse_event({"type": "decision", "utterance_id": "u1", **fields}), text=text)
+
+    # From a real call: a long sentence read as a name, with no business intent
+    long_name = decision(
+        "cálcio nome oi brasileira vinte e oito e vinte e nove não é com vinte e sete gente vai está aqui",
+        intent="name_provide",
+        action="clarify",
+        custom_intent="other",
+        custom_intent_confidence=0.48,
+    )
+    assert long_name.drifting and not long_name.unclear and not long_name.off_topic
+    # A short name is a name; a clear question is off topic, not drifting
+    assert not decision("lucas", intent="name_provide", action="respond", custom_intent="other").drifting
+    question = decision(
+        "qual foi o resultado do jogo do flamengo ontem à noite lá no maracanã",
+        intent="question_service",
+        action="escalate",
+        custom_intent="other",
+        custom_intent_confidence=1.0,
+    )
+    assert question.off_topic and not question.drifting
+    # A long order with a sure business intent is not a detour
+    order = decision(
+        "eu quero uma grande de calabresa e uma média meio frango meio portuguesa por favor",
+        intent="complex",
+        action="escalate",
+        custom_intent="pedir_pizza",
+        custom_intent_confidence=1.0,
+    )
+    assert not order.drifting
+
+
+async def test_decision_carries_the_text_and_expect_precise_is_sent():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        received.append(json.loads(await ws.recv()))
+        await ws.send(json.dumps({"type": "transcript", "utterance_id": "u1", "text": "chocolate", "assessment": {}}))
+        await ws.send(json.dumps({"type": "decision", "utterance_id": "u1", "intent": "complex", "action": "escalate"}))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        decisions = []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    await call.expect_precise()
+                elif isinstance(event, Decision):
+                    decisions.append(event)
+        return decisions
+
+    decisions = await _with_server(handler, body)
+    assert received == [{"type": "expect_precise"}]
+    assert decisions[0].text == "chocolate"
+
+
+async def test_ask_sends_the_question_with_its_expectations_and_decisions_bring_the_engine_reading():
+    received: list[dict] = []
+
+    async def handler(ws):
+        await ws.send(json.dumps({"type": "session.started", "session_id": "vs_1"}))
+        ask = json.loads(await ws.recv())
+        received.append(ask)
+        await ws.send(json.dumps({"type": "transcript", "utterance_id": "u1", "text": "aquela doce", "assessment": {}}))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "decision",
+                    "utterance_id": "u1",
+                    "intent": "complex",
+                    "action": "escalate",
+                    "custom_intent": "pedir_pizza",
+                    "choice": "chocolate",
+                    "choice_confidence": 0.8,
+                    "answer": None,
+                    "guidance": None,
+                    "handled": False,
+                }
+            )
+        )
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "decision",
+                    "utterance_id": "u2",
+                    "intent": "unclear",
+                    "action": "clarify",
+                    "guidance": "unclear",
+                    "handled": True,
+                    "guided_text": "Pode repetir?",
+                }
+            )
+        )
+        await ws.send(json.dumps({"type": "slot", "id": ask["id"], "value": "Rua X, 10", "status": "found"}))
+        await ws.send(json.dumps({"type": "session.ended", "reason": "client", "billed_seconds": 1}))
+
+    async def body(ermis, url):
+        decisions, values = [], []
+        async with ermis.connect(url) as call:
+            async for event in call:
+                if isinstance(event, SessionStarted):
+                    question = await call.ask(
+                        "De qual sabor? Custa R$ 49",
+                        choices=[CustomIntent("chocolate", "chocolate", "a pizza doce")],
+                        precise=True,
+                        slot=("endereco", "address"),
+                    )
+                elif isinstance(event, Decision):
+                    decisions.append(event)
+            values.append(await question.value)
+        return decisions, values
+
+    decisions, values = await _with_server(handler, body)
+    ask = received[0]
+    assert ask["type"] == "ask" and ask["text"] == "De qual sabor? Custa quarenta e nove reais"
+    assert ask["precise"] is True and ask["choices"][0]["key"] == "chocolate"
+    assert ask["slot"] == {"name": "endereco", "type": "address"}
+    first, second = decisions
+    assert first.chosen() == "chocolate" and first.text == "aquela doce" and not first.handled
+    assert second.handled and second.unclear and second.guided_text == "Pode repetir?"
+    assert values[0].value == "Rua X, 10"
+
+
+def test_no_reply_event():
+    from ermis import NoReply, parse_event
+
+    event = parse_event({"type": "no_reply", "count": 1, "handled": True, "guided_text": "Você ainda está aí?"})
+    assert isinstance(event, NoReply) and event.count == 1 and event.handled and event.guided_text
+    notify = parse_event({"type": "no_reply", "count": 2, "handled": False})
+    assert isinstance(notify, NoReply) and not notify.handled and notify.guided_text is None
+
+
+def test_partial_transcripts_noise_and_revised_slot():
+    from ermis import NoiseCalibrated, SlotResult, SpeechStarted, TranscriptPartial, parse_event
+    from ermis.options import session_body
+
+    assert session_body(partial_transcripts=True) == {"partial_transcripts": True}
+    assert "partial_transcripts" not in session_body()
+    partial = parse_event({"type": "transcript.partial", "utterance_id": "u3", "text": "quero saber"})
+    assert isinstance(partial, TranscriptPartial) and (partial.utterance_id, partial.text) == ("u3", "quero saber")
+    assert isinstance(started := parse_event({"type": "speech.started", "utterance_id": "u3"}), SpeechStarted)
+    assert started.utterance_id == "u3"
+    noise = parse_event(
+        {"type": "noise.calibrated", "noise_level": 1800.0, "noise_floor": 2000.0, "samples": 220, "noisy": True}
+    )
+    assert isinstance(noise, NoiseCalibrated) and noise.noisy and noise.samples == 220
+    slot = parse_event({"type": "slot", "id": "e1", "value": "a@b.com", "status": "found", "revised": True})
+    assert isinstance(slot, SlotResult) and slot.revised and slot.found
+
+
+def test_decision_complex_says_when_your_ai_is_worth_calling():
+    def decision(**fields):
+        return parse_event({"type": "decision", "utterance_id": "u1", **fields})
+
+    assert decision(intent="complex", action="escalate", complexity=0.5).complex()
+    assert decision(intent="complex", action="respond", complexity=0.9).complex()
+    assert not decision(intent="complex", action="respond", complexity=0.9).complex(threshold=1.0)
+    assert not decision(intent="name_provide", action="respond", complexity=0.0).complex()
+    # A goodbye or a request for a person never needs your AI
+    assert not decision(intent="farewell", action="escalate", is_escape=True, complexity=1.5).complex()

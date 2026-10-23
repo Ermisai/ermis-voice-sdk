@@ -5,8 +5,8 @@ Este SDK é a ponte do seu backend até ela: cria sessões e entrega os eventos
 da ligação como objetos Python, com métodos para mandar o agente agir.
 """
 
-from .call import Call, CustomIntent
-from .client import Ermis, Session
+from .call import Call, CustomIntent, Question
+from .client import Ermis, Session, Voice
 from .errors import (
     APIError,
     AuthenticationError,
@@ -26,6 +26,8 @@ from .events import (
     Decision,
     ErrorEvent,
     Event,
+    NoiseCalibrated,
+    NoReply,
     ReplyTimeout,
     SessionEnded,
     SessionStarted,
@@ -35,6 +37,8 @@ from .events import (
     SpeechEnded,
     SpeechStarted,
     Transcript,
+    TranscriptPartial,
+    TranscriptRevised,
     UnknownEvent,
     Usage,
     WaitingSpoken,
@@ -42,8 +46,9 @@ from .events import (
     parse_event,
 )
 from .options import BargeInOptions, VadOptions, WaitingOptions
+from .speech_text import normalize_for_speech, number_to_words
 
-__version__ = "0.2.0a1"
+__version__ = "0.4.0a1"
 
 __all__ = [
     "APIError",
@@ -64,9 +69,12 @@ __all__ = [
     "InsufficientCreditsError",
     "InvalidRequestError",
     "MaxDurationError",
+    "Question",
     "RateLimitError",
     "ReplyTimeout",
     "Session",
+    "NoiseCalibrated",
+    "NoReply",
     "SessionEnded",
     "SessionStarted",
     "SessionTimeoutError",
@@ -76,11 +84,16 @@ __all__ = [
     "SpeechEnded",
     "SpeechStarted",
     "Transcript",
+    "TranscriptPartial",
+    "TranscriptRevised",
     "UnknownEvent",
+    "Voice",
     "Usage",
     "VadOptions",
     "WaitingOptions",
     "WaitingSpoken",
     "WarningEvent",
+    "normalize_for_speech",
+    "number_to_words",
     "parse_event",
 ]

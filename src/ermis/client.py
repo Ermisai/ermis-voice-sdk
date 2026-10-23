@@ -45,6 +45,43 @@ class Session:
         return {"audio_url": self.audio_url, "session_token": self.session_token}
 
 
+@dataclass(frozen=True)
+class Voice:
+    """Uma voz do agente. Use o ``id`` em ``sessions.create(voice=...)``."""
+
+    id: str
+    name: str
+    gender: str | None = None
+    language: str = "pt-BR"
+    description: str | None = None
+    production: bool = True
+    """``False`` para vozes só de teste, que não devem ser usadas com clientes reais."""
+    default: bool = False
+    """A voz usada quando ``voice`` não é informado."""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Voice:
+        return cls(
+            id=data["id"],
+            name=data.get("name") or data["id"],
+            gender=data.get("gender"),
+            language=data.get("language") or "pt-BR",
+            description=data.get("description"),
+            production=data.get("production", True),
+            default=data.get("default", False),
+        )
+
+
+class _Voices:
+    def __init__(self, client: Ermis) -> None:
+        self._client = client
+
+    async def list(self) -> list[Voice]:
+        """Vozes disponíveis para a sua conta (``GET /v1/voice/voices``), a padrão primeiro."""
+        data = await self._client._request("GET", "/v1/voice/voices")
+        return [Voice.from_dict(item) for item in data.get("voices", [])]
+
+
 class _Sessions:
     def __init__(self, client: Ermis) -> None:
         self._client = client
@@ -57,21 +94,55 @@ class _Sessions:
         language: str = UNSET,
         voice: str = UNSET,
         auto_decide: bool = UNSET,
+        partial_transcripts: bool = UNSET,
         transcription_priority: str = UNSET,
+        precise_wait_ms: int = UNSET,
+        turn_detection: str = UNSET,
+        early_turn: dict[str, Any] = UNSET,
+        custom_intents: list[Any] = UNSET,
+        vocabulary: list[str] = UNSET,
+        guard: dict[str, Any] = UNSET,
         vad: VadOptions | dict[str, Any] = UNSET,
         barge_in: BargeInOptions | dict[str, Any] = UNSET,
         waiting: WaitingOptions | dict[str, Any] = UNSET,
         max_duration_s: int = UNSET,
         metadata: dict[str, Any] = UNSET,
     ) -> Session:
-        """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API."""
+        """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
+
+        ``custom_intents`` (lista de ``CustomIntent``): as intenções do seu negócio. Cada ``Decision``
+        automática já traz em ``custom_intent`` a que se aplica, sem chamar ``call.decide()``.
+
+        ``vocabulary`` (lista de palavras): termos do seu negócio (sabores, serviços, produtos). Quando a
+        transcrição sai parecida com um deles pelo som ("marquerita"), o texto já chega corrigido.
+
+        ``partial_transcripts``: o texto enquanto o cliente ainda fala (eventos ``TranscriptPartial``), para
+        mostrar na tela ou adiantar trabalho. Pode mudar até a ``Transcript`` final.
+
+        ``precise_wait_ms`` (Ermis Voice API 0.4.0): com ``transcription_priority`` ``latency`` ou
+        ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
+        maior precisão, em ms (padrão da API: 0, não espera).
+
+        ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
+        frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
+        ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
+        ``off_topic`` vazio: as perguntas fora do tema chegam ao seu código (por exemplo, para a sua IA).
+        As decisões que a Ermis já respondeu chegam com ``handled``.
+        """
         body = session_body(
             transport=transport,
             audio_format=audio_format,
             language=language,
             voice=voice,
             auto_decide=auto_decide,
+            partial_transcripts=partial_transcripts,
             transcription_priority=transcription_priority,
+            precise_wait_ms=precise_wait_ms,
+            turn_detection=turn_detection,
+            early_turn=early_turn,
+            custom_intents=custom_intents,
+            vocabulary=vocabulary,
+            guard=guard,
             vad=vad,
             barge_in=barge_in,
             waiting=waiting,
@@ -104,7 +175,8 @@ class Ermis:
     ::
 
         ermis = Ermis()  # lê ERMIS_API_KEY
-        session = await ermis.sessions.create(transport="twilio")
+        voices = await ermis.voices.list()
+        session = await ermis.sessions.create(transport="twilio", voice=voices[0].id)
         async with ermis.connect(session) as call:
             async for event in call:
                 ...
@@ -124,6 +196,7 @@ class Ermis:
         self.base_url = (base_url or os.environ.get("ERMIS_API_URL") or DEFAULT_BASE_URL).rstrip("/")
         self._http = http_client or httpx.AsyncClient(base_url=self.base_url, timeout=timeout)
         self.sessions = _Sessions(self)
+        self.voices = _Voices(self)
 
     @property
     def sandbox(self) -> bool:
@@ -161,10 +234,14 @@ class Ermis:
         """Carteira oficial: balance, reserved_credits e available_credits."""
         return await self._request("GET", "/v1/account/balance")
 
-    def connect(self, session: Session | str) -> _CallConnector:
-        """Abre o canal de controle de ``session`` (ou de uma ``control_url``). Use com ``async with``."""
+    def connect(self, session: Session | str, *, normalize_text: bool = True) -> _CallConnector:
+        """Abre o canal de controle de ``session`` (ou de uma ``control_url``). Use com ``async with``.
+
+        ``normalize_text`` (padrão ``True``): cada fala passa por :func:`ermis.normalize_for_speech` antes de
+        ir para a voz (números por extenso, valores, datas, e-mails, sem markdown nem emojis).
+        """
         url = session.control_url if isinstance(session, Session) else session
-        return _CallConnector(url, self._auth())
+        return _CallConnector(url, self._auth(), normalize_text)
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -177,9 +254,10 @@ class Ermis:
 
 
 class _CallConnector:
-    def __init__(self, url: str, headers: dict[str, str]) -> None:
+    def __init__(self, url: str, headers: dict[str, str], normalize_text: bool) -> None:
         self._url = url
         self._headers = headers
+        self._normalize_text = normalize_text
         self._call: Call | None = None
 
     async def __aenter__(self) -> Call:
@@ -187,7 +265,7 @@ class _CallConnector:
             ws = await ws_connect(self._url, additional_headers=self._headers, max_size=2**22)
         except InvalidStatus as exc:
             raise from_http(exc.response.status_code, "não foi possível abrir o canal de controle") from exc
-        self._call = Call(ws)
+        self._call = Call(ws, normalize_text=self._normalize_text)
         self._call._start()
         return self._call
 
