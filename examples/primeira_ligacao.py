@@ -35,7 +35,7 @@ def responder(texto: str, decisao: Decision) -> str:
         return "Tudo bem. Obrigada pela ligação, até logo!"
     if decisao.intent == "greeting":
         return "Oi! Em que posso ajudar?"
-    return f"Entendi: {texto}. Vou verificar isso para você. Até logo!"
+    return f"Entendi: {texto.rstrip('.!?')}. Vou verificar isso para você. Até logo!"
 
 
 # ── 2. Áudio: WAV -> μ-law 8 kHz e de volta (só biblioteca padrão) ─────────

@@ -12,10 +12,10 @@ from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import InvalidStatus
 
 from .call import Call
-from .errors import AuthenticationError, InvalidRequestError, from_http
+from .errors import APIError, AuthenticationError, InvalidRequestError, from_http
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
-DEFAULT_BASE_URL = "https://api.ermis.ai"
+DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
 
 
 @dataclass(frozen=True)
@@ -207,7 +207,13 @@ class Ermis:
         return {"Authorization": f"Bearer {self.api_key}"}
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        resp = await self._http.request(method, path, headers=self._auth(), **kwargs)
+        try:
+            resp = await self._http.request(method, path, headers=self._auth(), **kwargs)
+        except httpx.TransportError as exc:  # endereço errado, sem rede, DNS: diz onde tentou e o que conferir
+            raise APIError(
+                f"não foi possível conectar à Voice API em {self.base_url} ({exc.__class__.__name__}: {exc}); "
+                "confira ERMIS_API_URL e a sua conexão"
+            ) from exc
         if resp.is_error:
             code = None
             try:

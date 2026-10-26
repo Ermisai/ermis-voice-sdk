@@ -664,3 +664,19 @@ def test_decision_complex_says_when_your_ai_is_worth_calling():
     assert not decision(intent="name_provide", action="respond", complexity=0.0).complex()
     # A goodbye or a request for a person never needs your AI
     assert not decision(intent="farewell", action="escalate", is_escape=True, complexity=1.5).complex()
+
+
+async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch):
+    from ermis import APIError
+    from ermis.client import DEFAULT_BASE_URL
+
+    monkeypatch.delenv("ERMIS_API_URL", raising=False)
+    assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
+
+    def recusa(request):
+        raise httpx.ConnectError("nodename nor servname provided", request=request)
+
+    ermis = Ermis("ek_test_x", base_url="https://nao-existe.exemplo")
+    ermis._http = httpx.AsyncClient(base_url=ermis.base_url, transport=httpx.MockTransport(recusa))
+    with pytest.raises(APIError, match="nao-existe.exemplo.*ERMIS_API_URL"):
+        await ermis.balance()
