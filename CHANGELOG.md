@@ -7,6 +7,8 @@ Requer a Ermis Voice API 0.4.0.
 - O endereço padrão agora é `https://voice-api.live.ermis.ai` (o antigo `https://api.ermis.ai` não responde mais): sem `ERMIS_API_URL`, o SDK conectava num endereço que não existe e falhava com `ConnectError`.
 - Falha de conexão (endereço errado, sem rede, DNS) vira `APIError` com o endereço tentado e o que conferir, em vez do erro cru do `httpx`.
 - `primeira_ligacao.py`: a resposta não repete o ponto final da fala ("boleto..").
+- Novo exemplo `checa_conexao.py` e novo passo 3 em [Primeiros passos](docs/primeiros-passos.md): teste de conexão e de créditos (chave, endereço, vozes e saldo) antes da primeira ligação, com uma tabela dos erros comuns. A primeira ligação sem telefone (hello world) passa a ser o passo 4.
+- Documentação: a chave de API é a criada na plataforma da Ermis (página Tokens API), com acesso ao Ermis Voice.
 - Correção da nota da 0.4.0a1: `"man"` e `"woman"` não são mais aceitos em `voice`; use o `id` de `ermis.voices.list()` ("Alex", "Sarah"…).
 
 ## 0.4.0a1 (prévia)

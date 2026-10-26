@@ -4,7 +4,7 @@ Cole o prompt abaixo no seu assistente de código (Claude, ChatGPT, Cursor, Copi
 
 O prompt traz tudo o que o assistente precisa: como a Ermis funciona, a lista exata de classes e métodos do SDK, as regras de uma boa ligação, um exemplo completo e uma API simulada para testar o código sem telefone. Ele vale para o SDK **0.3.0a1**; se você usa outra versão, pegue o prompt da mesma versão no histórico deste repositório.
 
-Ao receber o código, rode os testes que o assistente escreveu (`pytest`) e depois siga o passo 6 de [Primeiros passos](primeiros-passos.md#6-ligação-de-verdade-pelo-twilio) para ligar de verdade.
+Ao receber o código, rode os testes que o assistente escreveu (`pytest`) e depois siga o passo 7 de [Primeiros passos](primeiros-passos.md#7-ligação-de-verdade-pelo-twilio) para ligar de verdade.
 
 ---
 

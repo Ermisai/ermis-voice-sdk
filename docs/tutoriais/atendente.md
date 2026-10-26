@@ -42,8 +42,8 @@ Quanto mais falas a camada 1 e a camada 2 resolvem, mais rápido e previsível f
 ```bash
 python --version                  # 3.10 ou mais novo
 pip install ermis-voice fastapi uvicorn python-multipart
-export ERMIS_API_KEY="..."        # chave do Ermis Voice: ek_test_… (Sandbox) ou ek_live_… (produção)
-export ERMIS_API_URL="..."        # URL do Ermis Voice (durante a prévia, entregue pela equipe da Ermis)
+export ERMIS_API_KEY="..."        # chave de API da plataforma da Ermis, com acesso ao Ermis Voice
+# ERMIS_API_URL: só se a equipe da Ermis indicar outro endereço (padrão: https://voice-api.live.ermis.ai)
 ```
 
 A chave fica **só no servidor**: nunca no navegador, no aplicativo ou no repositório. `Ermis()` lê as duas variáveis:
@@ -563,7 +563,7 @@ python -m pytest tests/test_example_flows.py -q
 | A IA inventa informações | Coloque os fatos no prompt e dê a ela a saída `[TRANSFERIR]` |
 | Muitas ligações terminam em `too_noisy` | Tire o `too_noisy` do `guard` e peça ao cliente para falar mais perto do telefone |
 
-Antes de ir para produção, passe pela [lista de conferência](../primeiros-passos.md#8-antes-de-ir-para-produção).
+Antes de ir para produção, passe pela [lista de conferência](../primeiros-passos.md#9-antes-de-ir-para-produção).
 
 ## O resultado
 
