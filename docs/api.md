@@ -25,7 +25,7 @@ Tudo roda na Ermis: detecção de fala, transcrição, decisões e voz. Você pa
 
 Um atendente por telefone com o Twilio, em quatro passos.
 
-**1. Gere uma chave de API** no painel da Ermis. Chaves `ek_test_…` usam o ambiente Sandbox; `ek_live_…`, produção. Use a chave só no seu servidor.
+**1. Gere uma chave de API** na plataforma da Ermis (página Tokens API), com acesso ao Ermis Voice. Use a chave só no seu servidor. Para conferir a chave e os créditos: `GET /v1/account/balance`.
 
 **2. Quando a ligação chegar, crie uma sessão:**
 
@@ -99,7 +99,7 @@ O SDK não processa áudio nem decide nada: quem conduz a ligação é a Voice A
 
 | Credencial | Onde usar | Validade |
 |---|---|---|
-| **Chave de API** (`ek_live_…`, `ek_test_…`) | Só no seu servidor: REST e canal de controle, no header `Authorization: Bearer <chave>` | Até você revogar no painel |
+| **Chave de API** (criada na plataforma) | Só no seu servidor: REST e canal de controle, no header `Authorization: Bearer <chave>` | Até você revogar no painel |
 | **Token de sessão** (`st_…`) | Onde o áudio nasce (Twilio ou navegador), para conectar o áudio de **uma** sessão | Uso único; expira se não for usado em 5 minutos |
 
 Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o token de sessão.

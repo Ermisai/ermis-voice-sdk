@@ -32,4 +32,4 @@ Os cenários usam as camadas em proporções diferentes. Uma [URA](ura.md) vive 
 - **Toda ligação termina:** com uma despedida seguida de `end()`, com uma transferência ou com o limite de `max_duration_s`.
 - **Testes sem telefone:** [`tests/test_example_flows.py`](../../tests/test_example_flows.py) roda cada exemplo contra uma Voice API simulada, que faz o papel do cliente. Use o mesmo formato para testar o seu agente.
 
-Antes de ir para produção, passe pela [lista de conferência](../primeiros-passos.md#8-antes-de-ir-para-produção).
+Antes de ir para produção, passe pela [lista de conferência](../primeiros-passos.md#9-antes-de-ir-para-produção).

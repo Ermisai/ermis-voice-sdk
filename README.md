@@ -6,7 +6,7 @@
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
-**Novo por aqui?** O guia [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md) leva você da instalação a um número de telefone atendido pelo agente. No terceiro passo você já ouve o agente, sem telefone e sem navegador.
+**Novo por aqui?** O guia [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md) leva você da instalação a um número de telefone atendido pelo agente. No terceiro passo você confere a conexão e os créditos; no quarto, o hello world, já ouve o agente, sem telefone e sem navegador.
 
 **Vai montar um agente para um cenário?** Os [tutoriais](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/README.md) montam, passo a passo, um atendente, uma URA, um agendamento, pedidos por telefone, um assistente conduzido pela sua IA e uma ligação ativa. O [tutorial do atendente](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/tutoriais/atendente.md) explica a configuração inteira: Twilio ou navegador, nome e voz do agente, calibragem de ruído, qualidade e latência, respostas pré-definidas e a sua IA externa (camada 3).
 
@@ -83,9 +83,9 @@ Para instalar direto do GitHub (por exemplo, uma versão ainda não publicada no
 pip install "git+https://github.com/Ermisai/ermis-voice-sdk.git"
 ```
 
-Durante a prévia, a chave e a URL da Voice API são entregues pela equipe da Ermis. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`.
+A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`.
 
-Chaves `ek_test_…` usam o Sandbox; `ek_live_…`, produção. **Use a chave só no servidor.**
+**Use a chave só no servidor.** Para conferir a chave, o endereço e os créditos antes de tudo: [`checa_conexao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/checa_conexao.py).
 
 ## Início rápido (Twilio)
 
@@ -119,6 +119,7 @@ Exemplo completo, com respostas rápidas, confirmação, desistência e despedid
 
 | Exemplo | O que mostra |
 |---|---|
+| [`checa_conexao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/checa_conexao.py) | Teste de conexão: confere a chave, o endereço da API, as vozes e os créditos da conta, e diz o que conferir quando falha |
 | [`primeira_ligacao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/primeira_ligacao.py) | Fale com o agente sem telefone: envia um WAV gravado e salva a resposta em `resposta.wav` |
 | [`atendente_twilio.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/atendente_twilio.py) | Atendente geral por telefone: frases prontas, sua IA, confirmação, desistência e despedida |
 | [`agendamento.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/agendamento.py) | Marcar, remarcar e cancelar consultas: intenções do negócio na sessão, horários como opções faladas (`set_custom_intents`), telefone com `expect_slot`, confirmação |
@@ -128,7 +129,7 @@ Exemplo completo, com respostas rápidas, confirmação, desistência e despedid
 | [`confirmacao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/confirmacao.py) | Ligação ativa: o agente liga pelo Twilio, confirma a identidade e a consulta e registra o resultado |
 | [`pizzaria.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/pizzaria.py) | Pedidos de pizza por objetivos (nome, pizzas, endereço): `vocabulary` do cardápio, endereço com `expect_slot`, dúvidas no meio do pedido, `unclear` e `off_topic` |
 
-Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio; o passo a passo está em [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md#6-ligação-de-verdade-pelo-twilio).
+Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio; o passo a passo está em [Primeiros passos](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/primeiros-passos.md#7-ligação-de-verdade-pelo-twilio).
 
 ## Referência
 
