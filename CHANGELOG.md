@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1a1 (prévia)
+
+Requer a Ermis Voice API 0.4.0.
+
+- O endereço padrão agora é `https://voice-api.live.ermis.ai` (o antigo `https://api.ermis.ai` não responde mais): sem `ERMIS_API_URL`, o SDK conectava num endereço que não existe e falhava com `ConnectError`.
+- Falha de conexão (endereço errado, sem rede, DNS) vira `APIError` com o endereço tentado e o que conferir, em vez do erro cru do `httpx`.
+- `primeira_ligacao.py`: a resposta não repete o ponto final da fala ("boleto..").
+- Correção da nota da 0.4.0a1: `"man"` e `"woman"` não são mais aceitos em `voice`; use o `id` de `ermis.voices.list()` ("Alex", "Sarah"…).
+
 ## 0.4.0a1 (prévia)
 
 Requer a Ermis Voice API 0.4.0.

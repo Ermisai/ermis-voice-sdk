@@ -68,7 +68,7 @@ Resumindo: **a Voice API conduz a ligação; o SDK é o controle remoto; a intel
 
 ```bash
 pip install ermis-voice    # Python 3.10+
-export ERMIS_API_KEY=ek_test_...
+export ERMIS_API_KEY=...         # a chave de API criada na plataforma da Ermis (app.ermis.ai)
 ```
 
 O pacote se chama `ermis-voice` no pip e é importado como `ermis`:
@@ -83,7 +83,7 @@ Para instalar direto do GitHub (por exemplo, uma versão ainda não publicada no
 pip install "git+https://github.com/Ermisai/ermis-voice-sdk.git"
 ```
 
-Durante a prévia, a chave e a URL da Voice API são entregues pela equipe da Ermis. Defina `ERMIS_API_URL` se ela for diferente de `https://api.ermis.ai`.
+Durante a prévia, a chave e a URL da Voice API são entregues pela equipe da Ermis. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`.
 
 Chaves `ek_test_…` usam o Sandbox; `ek_live_…`, produção. **Use a chave só no servidor.**
 
@@ -134,7 +134,7 @@ Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio
 
 ### `Ermis(api_key=None, *, base_url=None, timeout=10.0, http_client=None)`
 
-Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ERMIS_API_URL` ou usa `https://api.ermis.ai`. Feche com `await ermis.aclose()` ou use `async with Ermis() as ermis`.
+Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ERMIS_API_URL` ou usa `https://voice-api.live.ermis.ai`. Feche com `await ermis.aclose()` ou use `async with Ermis() as ermis`.
 
 | Método | Chamada da API | Retorno |
 |---|---|---|
