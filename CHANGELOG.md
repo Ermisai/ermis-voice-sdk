@@ -1,18 +1,19 @@
 # Changelog
 
-## 0.4.6
+## 0.4.5
 
-**O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.6 fala com a API 0.4.6. Requer a Ermis
-Voice API 0.4.6 (publique o SDK só depois dela).
+**O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.5 fala com a API 0.4.5. Requer a Ermis
+Voice API 0.4.5 (publique o SDK só depois dela).
 
-- As rotas de voz levam a versão do SDK: `/v1/voice/v0.4.6/sessions`, `/v1/voice/v0.4.6/voices` (`v1` é a versão
-  da API HTTP; `v0.4.6`, a do motor de voz). Vale também com `ERMIS_API_URL` ou `base_url`, que continuam sendo só o
+- As rotas de voz levam a versão do SDK: `/v1/voice/v0.4.5/sessions`, `/v1/voice/v0.4.5/voices` (`v1` é a versão
+  da API HTTP; `v0.4.5`, a do motor de voz). Vale também com `ERMIS_API_URL` ou `base_url`, que continuam sendo só o
   endereço (`https://voice-api.live.ermis.ai`). Na API, `/v1/voice/...` sem versão é a mais nova.
-- Cada chamada diz a versão do SDK (`User-Agent: ermis-voice-python/0.4.6`): numa rota de outra versão, a API
+- Cada chamada diz a versão do SDK (`User-Agent: ermis-voice-python/0.4.5`): numa rota de outra versão, a API
   responde `sdk_version_mismatch`, dizendo qual SDK instalar.
-- `ermis.API_VERSION`: a versão da API com que este SDK fala. Uma correção só do SDK sai como `0.4.6.post1` e continua
-  falando com a 0.4.6.
-- Pula da 0.4.1a1 para a 0.4.6 para alinhar com o motor (0.4.2 a 0.4.5 foram versões só do motor).
+- `ermis.API_VERSION`: a versão da API com que este SDK fala. Uma correção só do SDK sai como `0.4.5.post1` e continua
+  falando com a 0.4.5.
+- Fala com o motor 0.4.5: mais folga no começo da fala, e o pedido para repetir quando o que ele ouviu não combina com a conversa.
+- Pula da 0.4.1a1 para a 0.4.5 para alinhar com o motor.
 
 ## 0.4.1a1 (prévia)
 
