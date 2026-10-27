@@ -17,6 +17,7 @@ from websockets.asyncio.server import serve
 
 import ermis
 from ermis import (
+    API_VERSION,
     AuthenticationError,
     BargeIn,
     ChannelLimitError,
@@ -69,7 +70,7 @@ async def test_create_session_sends_only_given_fields():
 
     assert session.session_id == "vs_1"
     assert seen[0].headers["authorization"] == "Bearer ek_test_123"
-    assert seen[0].url.path == "/v1/voice/sessions"
+    assert seen[0].url.path == f"/v1/voice/v{API_VERSION}/sessions"  # the route of the SDK's version
     assert json.loads(seen[0].content) == {
         "transport": "twilio",
         "voice": "woman",
@@ -153,7 +154,7 @@ async def test_list_voices_and_use_one():
     sent = []
 
     def api(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/voice/voices":
+        if request.url.path == f"/v1/voice/v{API_VERSION}/voices":
             return httpx.Response(
                 200,
                 json={
@@ -668,12 +669,15 @@ def test_decision_complex_says_when_your_ai_is_worth_calling():
 
 
 async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch):
-    from ermis import API_VERSION, APIError
+    from ermis import APIError
     from ermis.client import DEFAULT_BASE_URL
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
-    # The route of this SDK's version: SDK 0.4.6 talks to Ermis Voice 0.4.6
-    assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == f"https://voice-api.live.ermis.ai/{API_VERSION}"
+    assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
+    # The voice routes of this SDK's version: SDK 0.4.6 talks to Ermis Voice 0.4.6
+    from ermis.client import VOICE_PATH
+
+    assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH
 
     def recusa(request):
         raise httpx.ConnectError("nodename nor servname provided", request=request)

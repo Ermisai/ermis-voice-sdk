@@ -16,9 +16,9 @@ from .call import Call
 from .errors import APIError, AuthenticationError, InvalidRequestError, from_http
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
-DEFAULT_HOST = "https://voice-api.live.ermis.ai"
-# A rota da versão deste SDK: o SDK 0.4.6 fala com a Ermis Voice 0.4.6, e só com ela
-DEFAULT_BASE_URL = f"{DEFAULT_HOST}/{API_VERSION}"
+DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.6: o motor de voz): o SDK 0.4.6 fala com a Ermis Voice 0.4.6
+VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ class _Voices:
 
     async def list(self) -> list[Voice]:
         """Vozes disponíveis para a sua conta (``GET /v1/voice/voices``), a padrão primeiro."""
-        data = await self._client._request("GET", "/v1/voice/voices")
+        data = await self._client._request("GET", f"{VOICE_PATH}/voices")
         return [Voice.from_dict(item) for item in data.get("voices", [])]
 
 
@@ -152,7 +152,7 @@ class _Sessions:
             max_duration_s=max_duration_s,
             metadata=metadata,
         )
-        data = await self._client._request("POST", "/v1/voice/sessions", json=body)
+        data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(
             session_id=data["session_id"],
             audio_url=data["audio_url"],
@@ -163,11 +163,11 @@ class _Sessions:
 
     async def get(self, session_id: str) -> dict[str, Any]:
         """Estado da sessão e segundos cobrados até agora."""
-        return await self._client._request("GET", f"/v1/voice/sessions/{session_id}")
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}")
 
     async def end(self, session_id: str) -> None:
         """Encerra a sessão pelo REST (o mesmo que ``call.end()`` no canal de controle)."""
-        await self._client._request("DELETE", f"/v1/voice/sessions/{session_id}")
+        await self._client._request("DELETE", f"{VOICE_PATH}/sessions/{session_id}")
 
 
 class Ermis:
