@@ -674,7 +674,7 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
     assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
-    # The voice routes of this SDK's version: SDK 0.4.6 talks to Ermis Voice 0.4.6
+    # The voice routes of this SDK's version: SDK 0.4.4 talks to Ermis Voice 0.4.4
     from ermis.client import VOICE_PATH
 
     assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH

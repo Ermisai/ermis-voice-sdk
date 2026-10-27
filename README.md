@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Versão 0.4.6, a mesma da Ermis Voice API com que fala.** O SDK e a API andam juntos: o SDK 0.4.6 usa as rotas `/v1/voice/v0.4.6/...` da API. Nomes e campos ainda podem mudar entre versões.
+> **Versão 0.4.4, a mesma da Ermis Voice API com que fala.** O SDK e a API andam juntos: o SDK 0.4.4 usa as rotas `/v1/voice/v0.4.4/...` da API. Nomes e campos ainda podem mudar entre versões.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
@@ -83,7 +83,7 @@ Para instalar direto do GitHub (por exemplo, uma versão ainda não publicada no
 pip install "git+https://github.com/Ermisai/ermis-voice-sdk.git"
 ```
 
-A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`, nas rotas de voz da versão dele (`/v1/voice/v0.4.6/...`).
+A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`, nas rotas de voz da versão dele (`/v1/voice/v0.4.4/...`).
 
 **Use a chave só no servidor.** Para conferir a chave, o endereço e os créditos antes de tudo: [`checa_conexao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/checa_conexao.py).
 

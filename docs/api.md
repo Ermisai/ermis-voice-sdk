@@ -30,7 +30,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 **2. Quando a ligação chegar, crie uma sessão:**
 
 ```bash
-curl https://voice-api.live.ermis.ai/v1/voice/v0.4.6/sessions \
+curl https://voice-api.live.ermis.ai/v1/voice/v0.4.4/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
@@ -39,8 +39,8 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.4.6/sessions \
 ```json
 {
   "session_id": "vs_8f2c1a",
-  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.6/twilio",
-  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.6/sessions/vs_8f2c1a/control",
+  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.4/twilio",
+  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.4/sessions/vs_8f2c1a/control",
   "session_token": "st_…"
 }
 ```
@@ -50,7 +50,7 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.4.6/sessions \
 ```xml
 <Response>
   <Connect>
-    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.4.6/twilio">
+    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.4.4/twilio">
       <Parameter name="session_token" value="st_…" />
     </Stream>
   </Connect>
@@ -106,7 +106,7 @@ Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o to
 
 ## Sessões (REST)
 
-Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.4.6/sessions` é a 0.4.6 (`v1` é a versão da API HTTP; `v0.4.6`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
+Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.4.4/sessions` é a 0.4.4 (`v1` é a versão da API HTTP; `v0.4.4`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
 
 | Método e caminho | O que faz |
 |---|---|
