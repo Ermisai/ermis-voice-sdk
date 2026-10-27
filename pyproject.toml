@@ -1,6 +1,6 @@
 [project]
 name = "ermis-voice"
-version = "0.4.6"
+version = "0.4.3"
 description = "SDK Python da Ermis Voice API: crie sessões de voz e conduza a conversa pelo canal de controle."
 readme = "README.md"
 requires-python = ">=3.10"
