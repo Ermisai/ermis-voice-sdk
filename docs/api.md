@@ -30,7 +30,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 **2. Quando a ligação chegar, crie uma sessão:**
 
 ```bash
-curl https://voice-api.live.ermis.ai/v1/voice/sessions \
+curl https://voice-api.live.ermis.ai/0.4.6/v1/voice/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
@@ -39,8 +39,8 @@ curl https://voice-api.live.ermis.ai/v1/voice/sessions \
 ```json
 {
   "session_id": "vs_8f2c1a",
-  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/twilio",
-  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/sessions/vs_8f2c1a/control",
+  "audio_url": "wss://voice-api.live.ermis.ai/0.4.6/v1/voice/twilio",
+  "control_url": "wss://voice-api.live.ermis.ai/0.4.6/v1/voice/sessions/vs_8f2c1a/control",
   "session_token": "st_…"
 }
 ```
@@ -50,7 +50,7 @@ curl https://voice-api.live.ermis.ai/v1/voice/sessions \
 ```xml
 <Response>
   <Connect>
-    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/twilio">
+    <Stream url="wss://voice-api.live.ermis.ai/0.4.6/v1/voice/twilio">
       <Parameter name="session_token" value="st_…" />
     </Stream>
   </Connect>
@@ -106,7 +106,7 @@ Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o to
 
 ## Sessões (REST)
 
-Base: `https://voice-api.live.ermis.ai`
+Base: `https://voice-api.live.ermis.ai/<versão>` (ex.: `/0.4.6`). Cada versão da API tem a sua rota, e o SDK de mesmo número usa a dele; sem versão (`https://voice-api.live.ermis.ai/v1/...`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`). Uma versão que não existe responde `404 version_not_available`.
 
 | Método e caminho | O que faz |
 |---|---|

@@ -15,6 +15,7 @@ import httpx
 import pytest
 from websockets.asyncio.server import serve
 
+import ermis
 from ermis import (
     AuthenticationError,
     BargeIn,
@@ -667,11 +668,12 @@ def test_decision_complex_says_when_your_ai_is_worth_calling():
 
 
 async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch):
-    from ermis import APIError
+    from ermis import API_VERSION, APIError
     from ermis.client import DEFAULT_BASE_URL
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
-    assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
+    # The route of this SDK's version: SDK 0.4.6 talks to Ermis Voice 0.4.6
+    assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == f"https://voice-api.live.ermis.ai/{API_VERSION}"
 
     def recusa(request):
         raise httpx.ConnectError("nodename nor servname provided", request=request)
@@ -680,3 +682,25 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
     ermis._http = httpx.AsyncClient(base_url=ermis.base_url, transport=httpx.MockTransport(recusa))
     with pytest.raises(APIError, match="nao-existe.exemplo.*ERMIS_API_URL"):
         await ermis.balance()
+
+
+def test_sdk_and_api_versions_move_together():
+    """The SDK's X.Y.Z is the API version it talks to; pyproject.toml declares the same release."""
+    import re
+    from pathlib import Path
+
+    pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+    assert re.search(r'^version = "([^"]+)"', pyproject, re.M)[1] == ermis.__version__
+    assert re.fullmatch(r"\d+\.\d+\.\d+", ermis.API_VERSION) and ermis.__version__.startswith(ermis.API_VERSION)
+
+
+async def test_every_request_says_the_sdk_version():
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("user-agent"))
+        return httpx.Response(200, json={"available_credits": 10})
+
+    client = _client(handler)
+    await client.balance()
+    assert seen == [f"ermis-voice-python/{ermis.__version__}"]

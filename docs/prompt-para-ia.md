@@ -31,7 +31,8 @@ Descreva aqui, em linguagem natural:
 - O meu servidor só conduz a conversa: recebe eventos ("o cliente disse X e quer Y") e envia comandos
   ("fale Z"). O SDK é a ponte. Ele não processa áudio e não decide nada.
 - A chave fica só no servidor, em `ERMIS_API_KEY`; a URL da API em `ERMIS_API_URL`. `Ermis()` lê as duas
-  (sem `ERMIS_API_URL`, usa `https://voice-api.live.ermis.ai`; sem chave, levanta `AuthenticationError`).
+  (sem `ERMIS_API_URL`, usa a rota da versão do SDK, `https://voice-api.live.ermis.ai/0.4.6`; sem chave, levanta
+  `AuthenticationError`).
 - Fluxo de uma ligação: o Twilio chama meu webhook → crio a sessão → respondo com o TwiML da sessão →
   abro o canal de controle → recebo `SessionStarted` → falo a saudação → a cada fala do cliente recebo
   `Transcript` e logo depois `Decision` → respondo com `speak()` → na despedida chamo `end()` →

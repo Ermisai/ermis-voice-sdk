@@ -48,7 +48,7 @@ O áudio nunca passa pelo seu servidor: ele vai do telefone (ou do navegador) di
 export ERMIS_API_KEY="..."   # a chave de API da plataforma
 ```
 
-O SDK usa a Voice API em `https://voice-api.live.ermis.ai`. Defina `ERMIS_API_URL` só se a equipe da Ermis indicar outro endereço. Até a versão 0.4.0a1, o endereço padrão do SDK era antigo e não responde mais: nessas versões, defina `export ERMIS_API_URL="https://voice-api.live.ermis.ai"` (ou atualize o SDK).
+O SDK usa a Voice API na rota da versão dele: o SDK 0.4.6 fala com `https://voice-api.live.ermis.ai/0.4.6`. Defina `ERMIS_API_URL` só se a equipe da Ermis indicar outro endereço. Até a versão 0.4.0a1, o endereço padrão do SDK era antigo e não responde mais: atualize o SDK.
 
 ## 2. Instale o SDK
 
@@ -56,7 +56,7 @@ O SDK usa a Voice API em `https://voice-api.live.ermis.ai`. Defina `ERMIS_API_UR
 python3.12 -m venv .venv          # um ambiente só para o projeto
 source .venv/bin/activate
 pip install -U pip ermis-voice
-python -c "import ermis; print(ermis.__version__)"   # 0.4.1a1 ou mais novo
+python -c "import ermis; print(ermis.__version__)"   # 0.4.6 ou mais novo
 ```
 
 O pacote se chama `ermis-voice` no pip e é importado como `ermis`.
@@ -71,8 +71,8 @@ python checa_conexao.py
 ```
 
 ```text
-SDK ermis-voice 0.4.1a1
-Voice API: https://voice-api.live.ermis.ai
+SDK ermis-voice 0.4.6
+Voice API: https://voice-api.live.ermis.ai/0.4.6
 Vozes: Alex, Bruno, Carlos, Daniel, Eduardo, Felipe, Hugo, Igor, João, Sarah, Ana, Beatriz, ...
 Créditos: 120 disponíveis (0 reservados em ligações)
 Tudo certo: a conexão funciona. Próximo passo: python primeira_ligacao.py minha_fala.wav

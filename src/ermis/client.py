@@ -11,11 +11,14 @@ import httpx
 from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import InvalidStatus
 
+from ._version import API_VERSION, USER_AGENT
 from .call import Call
 from .errors import APIError, AuthenticationError, InvalidRequestError, from_http
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
-DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
+DEFAULT_HOST = "https://voice-api.live.ermis.ai"
+# A rota da versão deste SDK: o SDK 0.4.6 fala com a Ermis Voice 0.4.6, e só com ela
+DEFAULT_BASE_URL = f"{DEFAULT_HOST}/{API_VERSION}"
 
 
 @dataclass(frozen=True)
@@ -204,7 +207,8 @@ class Ermis:
         return self.api_key.startswith("ek_test_")
 
     def _auth(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        # O User-Agent diz a versão do SDK: numa rota de outra versão, a API responde qual instalar
+        return {"Authorization": f"Bearer {self.api_key}", "User-Agent": USER_AGENT}
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         try:

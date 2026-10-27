@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Prévia (0.4.0a1).** A Voice API ainda está em desenvolvimento; nomes e campos podem mudar até o lançamento.
+> **Versão 0.4.6, a mesma da Ermis Voice API com que fala.** O SDK e a API andam juntos: o SDK 0.4.6 usa a rota `/0.4.6` da API. Nomes e campos ainda podem mudar entre versões.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
@@ -83,7 +83,7 @@ Para instalar direto do GitHub (por exemplo, uma versão ainda não publicada no
 pip install "git+https://github.com/Ermisai/ermis-voice-sdk.git"
 ```
 
-A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`.
+A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa a rota da versão dele, `https://voice-api.live.ermis.ai/0.4.6`.
 
 **Use a chave só no servidor.** Para conferir a chave, o endereço e os créditos antes de tudo: [`checa_conexao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/checa_conexao.py).
 
@@ -135,7 +135,7 @@ Os exemplos de telefone rodam com `uvicorn <arquivo>:app` e um número do Twilio
 
 ### `Ermis(api_key=None, *, base_url=None, timeout=10.0, http_client=None)`
 
-Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ERMIS_API_URL` ou usa `https://voice-api.live.ermis.ai`. Feche com `await ermis.aclose()` ou use `async with Ermis() as ermis`.
+Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ERMIS_API_URL` ou usa a rota da versão do SDK (`https://voice-api.live.ermis.ai/{ermis.API_VERSION}`). Feche com `await ermis.aclose()` ou use `async with Ermis() as ermis`.
 
 | Método | Chamada da API | Retorno |
 |---|---|---|
