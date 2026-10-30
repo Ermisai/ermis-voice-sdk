@@ -30,7 +30,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 **2. Quando a ligação chegar, crie uma sessão:**
 
 ```bash
-curl https://voice-api.live.ermis.ai/v1/voice/v0.4.8/sessions \
+curl https://voice-api.live.ermis.ai/v1/voice/v0.4.9/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
@@ -39,8 +39,8 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.4.8/sessions \
 ```json
 {
   "session_id": "vs_8f2c1a",
-  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.8/twilio",
-  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.8/sessions/vs_8f2c1a/control",
+  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.9/twilio",
+  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.4.9/sessions/vs_8f2c1a/control",
   "session_token": "st_…"
 }
 ```
@@ -50,7 +50,7 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.4.8/sessions \
 ```xml
 <Response>
   <Connect>
-    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.4.8/twilio">
+    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.4.9/twilio">
       <Parameter name="session_token" value="st_…" />
     </Stream>
   </Connect>
@@ -106,7 +106,7 @@ Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o to
 
 ## Sessões (REST)
 
-Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.4.8/sessions` é a 0.4.8 (`v1` é a versão da API HTTP; `v0.4.8`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
+Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.4.9/sessions` é a 0.4.9 (`v1` é a versão da API HTTP; `v0.4.9`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
 
 | Método e caminho | O que faz |
 |---|---|
@@ -130,6 +130,8 @@ Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do moto
 | `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa), `accuracy` (confere falas duvidosas), `local_first` (a leitura de maior qualidade só nas falas em que o reconhecimento rápido ficou em dúvida) ou `local_only` (só o reconhecimento rápido). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
 | `precise_wait_ms` | inteiro | `0` | Com `latency` e `local_first`: quanto uma resposta marcada como importante (`precise`, `slot`) espera a leitura de maior qualidade, em ms (0 a 3000). `0` (padrão): não espera; a leitura precisa chega depois, como revisão. As outras prioridades sempre esperam |
 | `turn_detection` | string | `smart_turn` | `smart_turn`: um modelo ouve como a fala termina e fecha o turno antes do silêncio completo quando a pessoa terminou; `silence`: só o silêncio de `vad.min_silence_ms` |
+| `end_of_turn` | string | `fast` | Quanto o agente espera numa pausa antes de responder. `fast`: responde mais rápido; `balanced` (cerca de 0,16 s a mais por turno) e `patient` (cerca de 0,37 s a mais) cortam menos quem faz pausas no meio da frase |
+| `ask_again_on_ambiguous_stt` | booleano | `true` | Quando a fala pode ter sido ouvida de duas formas com sentidos diferentes, a Ermis pergunta de novo (como numa fala confusa) em vez de seguir com uma delas. `false`: segue com a leitura mais provável |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
 | `early_turn.speculate` | bool | `false` | Começa a transcrever (e a decidir) já na pausa do cliente, antes de o turno fechar. Se o cliente voltar a falar, esse trabalho é descartado |
 | `early_turn.pause_ms` | int | `160` | Pausa que inicia esse trabalho adiantado (60 a 1000) |

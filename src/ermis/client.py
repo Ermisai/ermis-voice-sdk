@@ -17,7 +17,7 @@ from .errors import APIError, AuthenticationError, InvalidRequestError, from_htt
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
-# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.8: o motor de voz): o SDK 0.4.8 fala com a Ermis Voice 0.4.8
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.9: o motor de voz): o SDK 0.4.9 fala com a Ermis Voice 0.4.9
 VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 
@@ -101,6 +101,8 @@ class _Sessions:
         transcription_priority: str = UNSET,
         precise_wait_ms: int = UNSET,
         turn_detection: str = UNSET,
+        end_of_turn: str = UNSET,
+        ask_again_on_ambiguous_stt: bool = UNSET,
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
         vocabulary: list[str] = UNSET,
@@ -126,6 +128,13 @@ class _Sessions:
         ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
         maior precisão, em ms (padrão da API: 0, não espera).
 
+        ``end_of_turn`` (Ermis Voice API 0.4.9): quanto o agente espera numa pausa antes de responder.
+        ``"fast"`` (padrão) responde mais rápido; ``"balanced"`` (cerca de 0,16 s a mais por turno) e
+        ``"patient"`` (cerca de 0,37 s a mais) cortam menos quem faz pausas no meio da frase.
+
+        ``ask_again_on_ambiguous_stt`` (Ermis Voice API 0.4.9, ligado por padrão): quando a fala pode ter sido
+        ouvida de duas formas com sentidos diferentes, a Ermis pergunta de novo em vez de seguir com uma delas.
+
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
         ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
@@ -142,6 +151,8 @@ class _Sessions:
             transcription_priority=transcription_priority,
             precise_wait_ms=precise_wait_ms,
             turn_detection=turn_detection,
+            end_of_turn=end_of_turn,
+            ask_again_on_ambiguous_stt=ask_again_on_ambiguous_stt,
             early_turn=early_turn,
             custom_intents=custom_intents,
             vocabulary=vocabulary,

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.9
+
+Requer a Ermis Voice API 0.4.9 (publique o SDK só depois dela). O SDK 0.4.9 fala com `/v1/voice/v0.4.9/...`.
+
+- `sessions.create(end_of_turn=...)`: quanto o agente espera numa pausa antes de responder. `"fast"` (padrão),
+  `"balanced"` (cerca de 0,16 s a mais por turno) ou `"patient"` (cerca de 0,37 s a mais), que cortam menos quem faz
+  pausas no meio da frase.
+- `sessions.create(ask_again_on_ambiguous_stt=...)`: no motor 0.4.9, quando a fala pode ter sido ouvida de duas
+  formas com sentidos diferentes, a Ermis pergunta de novo em vez de seguir com uma delas (ligado por padrão;
+  `False` desliga).
+
 ## 0.4.8
 
 **O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.8 fala com a API 0.4.8. Requer a Ermis

@@ -93,6 +93,8 @@ def session_body(
     transcription_priority: Literal["balanced", "latency", "accuracy", "local_first", "local_only"] = UNSET,
     precise_wait_ms: int = UNSET,
     turn_detection: Literal["smart_turn", "silence"] = UNSET,
+    end_of_turn: Literal["fast", "balanced", "patient"] = UNSET,
+    ask_again_on_ambiguous_stt: bool = UNSET,
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
     vocabulary: list[str] = UNSET,
@@ -114,6 +116,8 @@ def session_body(
         "transcription_priority": transcription_priority,
         "precise_wait_ms": precise_wait_ms,
         "turn_detection": turn_detection,
+        "end_of_turn": end_of_turn,
+        "ask_again_on_ambiguous_stt": ask_again_on_ambiguous_stt,
         "early_turn": early_turn,
         "custom_intents": custom_intents
         if custom_intents is UNSET

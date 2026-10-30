@@ -358,6 +358,10 @@ def test_transcription_priority_option():
     assert session_body(transcription_priority="latency") == {"transcription_priority": "latency"}
     assert "transcription_priority" not in session_body()
     assert session_body(precise_wait_ms=0) == {"precise_wait_ms": 0}  # 0 is sent: never wait
+    assert session_body(end_of_turn="patient", ask_again_on_ambiguous_stt=False) == {
+        "end_of_turn": "patient",
+        "ask_again_on_ambiguous_stt": False,
+    }  # False is sent: turns the 0.4.9 default off
 
 
 def test_waiting_options_new_fields():
@@ -674,7 +678,7 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
     assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
-    # The voice routes of this SDK's version: SDK 0.4.8 talks to Ermis Voice 0.4.8
+    # The voice routes of this SDK's version: SDK 0.4.9 talks to Ermis Voice 0.4.9
     from ermis.client import VOICE_PATH
 
     assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH

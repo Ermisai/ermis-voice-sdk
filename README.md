@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Ermisai/ermis-voice-sdk/actions/workflows/ci.yml)
 
-> **Versão 0.4.8, a mesma da Ermis Voice API com que fala.** O SDK e a API andam juntos: o SDK 0.4.8 usa as rotas `/v1/voice/v0.4.8/...` da API. Nomes e campos ainda podem mudar entre versões.
+> **Versão 0.4.9, a mesma da Ermis Voice API com que fala.** O SDK e a API andam juntos: o SDK 0.4.9 usa as rotas `/v1/voice/v0.4.9/...` da API. Nomes e campos ainda podem mudar entre versões.
 
 O SDK liga o **seu backend** à **Ermis Voice API**. Ele cria sessões, abre o canal de controle e entrega os eventos da ligação como objetos Python, com métodos para mandar o agente agir.
 
@@ -83,7 +83,7 @@ Para instalar direto do GitHub (por exemplo, uma versão ainda não publicada no
 pip install "git+https://github.com/Ermisai/ermis-voice-sdk.git"
 ```
 
-A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`, nas rotas de voz da versão dele (`/v1/voice/v0.4.8/...`).
+A chave de API é criada na plataforma da Ermis ([app.ermis.ai](https://app.ermis.ai), página Tokens API), com acesso ao Ermis Voice. Sem `ERMIS_API_URL`, o SDK usa `https://voice-api.live.ermis.ai`, nas rotas de voz da versão dele (`/v1/voice/v0.4.9/...`).
 
 **Use a chave só no servidor.** Para conferir a chave, o endereço e os créditos antes de tudo: [`checa_conexao.py`](https://github.com/Ermisai/ermis-voice-sdk/blob/main/examples/checa_conexao.py).
 
@@ -150,7 +150,7 @@ Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ER
 `usage()` devolve os lançamentos de crédito em páginas: passe o `next_cursor` recebido em `before` para buscar a página seguinte (`limit` de 1 a 100). `balance()` devolve `balance`, `reserved_credits` (reservado por ligações em andamento) e `available_credits`, em créditos inteiros.
 
 **Opções de `sessions.create`** (todas opcionais; o que você não passar usa o padrão da API):
-`transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice` (um `id` de `voices.list()`), `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`, `"local_first"`, `"local_only"`), `turn_detection` (`"smart_turn"`, `"silence"`), `early_turn={"speculate": True, "close_on_complete_text": True}`, `custom_intents=[CustomIntent(…)]` (as intenções do seu negócio, respondidas em cada `Decision`), `vocabulary=[…]` (palavras do seu negócio: a transcrição chega corrigida), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`.
+`transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice` (um `id` de `voices.list()`), `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`, `"local_first"`, `"local_only"`), `turn_detection` (`"smart_turn"`, `"silence"`), `end_of_turn` (`"fast"`, `"balanced"`, `"patient"`), `ask_again_on_ambiguous_stt`, `early_turn={"speculate": True, "close_on_complete_text": True}`, `custom_intents=[CustomIntent(…)]` (as intenções do seu negócio, respondidas em cada `Decision`), `vocabulary=[…]` (palavras do seu negócio: a transcrição chega corrigida), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`.
 
 ```python
 from ermis import WaitingOptions
