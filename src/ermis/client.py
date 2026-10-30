@@ -17,7 +17,7 @@ from .errors import APIError, AuthenticationError, InvalidRequestError, from_htt
 from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
-# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.6: o motor de voz): o SDK 0.4.6 fala com a Ermis Voice 0.4.6
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.8: o motor de voz): o SDK 0.4.8 fala com a Ermis Voice 0.4.8
 VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 

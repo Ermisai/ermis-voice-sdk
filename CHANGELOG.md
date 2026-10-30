@@ -1,18 +1,21 @@
 # Changelog
 
-## 0.4.6
+## 0.4.8
 
-**O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.6 fala com a API 0.4.6. Requer a Ermis
-Voice API 0.4.6 (publique o SDK só depois dela).
+**O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.8 fala com a API 0.4.8. Requer a Ermis
+Voice API 0.4.8 (publique o SDK só depois dela).
 
-- As rotas de voz levam a versão do SDK: `/v1/voice/v0.4.6/sessions`, `/v1/voice/v0.4.6/voices` (`v1` é a versão
-  da API HTTP; `v0.4.6`, a do motor de voz). Vale também com `ERMIS_API_URL` ou `base_url`, que continuam sendo só o
+- As rotas de voz levam a versão do SDK: `/v1/voice/v0.4.8/sessions`, `/v1/voice/v0.4.8/voices` (`v1` é a versão
+  da API HTTP; `v0.4.8`, a do motor de voz). Vale também com `ERMIS_API_URL` ou `base_url`, que continuam sendo só o
   endereço (`https://voice-api.live.ermis.ai`). Na API, `/v1/voice/...` sem versão é a mais nova.
-- Cada chamada diz a versão do SDK (`User-Agent: ermis-voice-python/0.4.6`): numa rota de outra versão, a API
+- Cada chamada diz a versão do SDK (`User-Agent: ermis-voice-python/0.4.8`): numa rota de outra versão, a API
   responde `sdk_version_mismatch`, dizendo qual SDK instalar.
-- `ermis.API_VERSION`: a versão da API com que este SDK fala. Uma correção só do SDK sai como `0.4.6.post1` e continua
-  falando com a 0.4.6.
-- Pula da 0.4.1a1 para a 0.4.6 para alinhar com o motor (0.4.2 a 0.4.5 foram versões só do motor).
+- `ermis.API_VERSION`: a versão da API com que este SDK fala. Uma correção só do SDK sai como `0.4.8.post1` e continua
+  falando com a 0.4.8.
+- Fala com o motor 0.4.8: o fim do turno ajustado em fala real, e a fala que chega enquanto a resposta é preparada
+  continua o turno do cliente. Em linhas ruidosas, o motor percebe a linha na saudação: a fala começa a ser ouvida mais
+  cedo, estalos não interrompem o agente, e falar por cima da saudação precisa passar do ruído ouvido até ali.
+- Pula da 0.4.1a1 para a 0.4.8 para alinhar com o motor (0.4.2 a 0.4.7 foram versões só do motor).
 
 ## 0.4.1a1 (prévia)
 
