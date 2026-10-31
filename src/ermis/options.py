@@ -85,11 +85,13 @@ EndOfTurn = Literal["fast", "balanced", "patient"]
 
 Troca latência por acurácia; medido em fala humana ao telefone (português, 8 kHz):
 
-- ``"fast"`` (padrão): 0,43 s em média até o fim do turno; 42% das pausas de quem ia continuar viram fim de turno.
-- ``"balanced"``: **+0,16 s em todo turno** (0,60 s); 23% das pausas.
+- ``"fast"``: 0,43 s em média até o fim do turno; 42% das pausas de quem ia continuar viram fim de turno.
+- ``"balanced"`` (padrão no motor 0.5.0): **+0,16 s em todo turno** em relação ao ``"fast"`` (0,60 s); 23% das pausas.
 - ``"patient"``: **+0,37 s em todo turno** (0,80 s); 9% das pausas.
 
-Os campos ``vad`` e ``early_turn`` que você mandar ganham do perfil.
+Sem ``end_of_turn``, vale o padrão da versão do motor: ``"balanced"`` no 0.5.0, ``"fast"`` até o 0.4.9. Os campos
+``vad`` e ``early_turn`` que você mandar ganham do perfil (não mande ``early_turn.close_on_complete_text`` se quiser
+que o perfil decida).
 """
 
 
@@ -118,7 +120,8 @@ def session_body(
 ) -> dict[str, Any]:
     """Monta o corpo JSON de criação de sessão, sem os campos não informados.
 
-    ``end_of_turn``: ver :data:`EndOfTurn` (**adiciona latência** fora de ``"fast"``: +0,16 s ou +0,37 s por turno).
+    ``end_of_turn``: ver :data:`EndOfTurn` (**adiciona latência** fora de ``"fast"``: +0,16 s ou +0,37 s por turno;
+    padrão ``"balanced"`` no motor 0.5.0).
     ``ask_again_on_ambiguous_stt``: ver ``Sessions.create`` (**adiciona latência**: +5 a +30 ms por turno, às vezes
     uma decisão a mais, ~0,2 s, e perguntas a mais).
     """

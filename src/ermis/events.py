@@ -101,7 +101,12 @@ class Decision(Event):
     answer: str | None = None
     """``"yes"``, ``"no"`` ou ``None``: o sim/não da fala como resposta à última pergunta do agente."""
     guidance: str | None = None
-    """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"`` ou ``None``."""
+    """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"``, ``"misheard"``
+    (a transcrição provavelmente não é o que o cliente disse) ou ``None``.
+
+    Motor 0.5.0: ``raw["uncertain"]`` e ``raw["uncertain_reasons"]`` dizem quando o texto da fala pode estar errado
+    (``"misheard_again"``, ``"stt_ambiguous"``, ``"stt_rival"``, ``"readings_differ"``, ``"low_heard"``): leia de
+    volta um dado que veio dessa fala antes de usar."""
     handled: bool = False
     """Com o ``guard`` da sessão: a Ermis já respondeu esta fala (``guided_text``). Não responda."""
     guided_text: str | None = None
@@ -209,7 +214,14 @@ class Decision(Event):
 
 @dataclass(frozen=True)
 class SlotResult(Event):
-    """Resposta de ``call.extract_slot()``."""
+    """Resposta de ``call.extract_slot()`` (e o valor de ``expect_slot`` / ``ask(..., slot=...)``).
+
+    Motor 0.5.0, no valor de ``expect_slot``: ``raw["uncertain"]`` (o valor pode estar errado: leia de volta para o
+    cliente confirmar antes de usar), ``raw["uncertain_reasons"]`` (os da ``Decision`` da fala, mais
+    ``"readings_differ"``: o outro reconhecimento dá outro valor; ``"stt_rival"``: a leitura rival dá outro valor;
+    ``"low_confidence"``) e ``raw["alternatives"]`` (``[{"value", "text", "source"}]``, os outros valores lidos). O
+    ``value`` é sempre o ouvido pela leitura de maior qualidade: a Ermis não troca o valor. Sem custo de latência.
+    """
 
     id: str
     value: Any
@@ -217,7 +229,6 @@ class SlotResult(Event):
     """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido)."""
     revised: bool = False
     """Com prioridade de latência: o valor relido pelo reconhecimento de maior precisão, diferente do primeiro."""
-
     @property
     def found(self) -> bool:
         return self.status == "found"

@@ -137,28 +137,33 @@ class _Sessions:
         ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
         maior precisão, em ms (padrão da API: 0, não espera).
 
-        Latência × acurácia (Ermis Voice API 0.4.9): as duas opções abaixo trocam tempo de resposta por acurácia e
-        ficam no lado rápido por padrão.
-
-        ``end_of_turn`` (``"fast"``, ``"balanced"`` ou ``"patient"``; ver :data:`ermis.options.EndOfTurn`): quanto a
-        Ermis espera depois que o cliente para de falar. ``"fast"`` (padrão) responde em 0,43 s, mas trata como fim
-        42% das pausas de quem ia continuar; ``"balanced"`` **adiciona 0,16 s a todo turno** (23% das pausas);
-        ``"patient"`` **adiciona 0,37 s a todo turno** (9%).
-
-        ``ask_again_on_ambiguous_stt``: quando o reconhecimento leu a fala de dois jeitos parecidos que mudam o
-        sentido ("quero calabresa" / "quero cala a breve"), a Ermis pergunta de novo em vez de seguir (a
-        ``Decision`` vem com ``guidance`` ``"misheard"`` e, em ``raw``, ``misheard_reason`` ``"stt_ambiguous"`` e
-        ``heard_alternatives``); a segunda seguida encerra (``give_up`` do ``guard``). Ela nunca age sobre a outra
-        leitura. **Adiciona latência**: +5 a +30 ms por turno (as N melhores leituras do reconhecimento) e, nas
-        falas com duas leituras, uma decisão a mais em paralelo (às vezes ~0,2 s de espera); e **perguntas a
-        mais** (8% das falas num teste offline; 2% dos turnos numa rodada de ligações de teste). ``None``: o
-        padrão da versão do motor (ligado na 0.4.9).
-
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
         ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
         ``off_topic`` vazio: as perguntas fora do tema chegam ao seu código (por exemplo, para a sua IA).
-        As decisões que a Ermis já respondeu chegam com ``handled``.
+        As decisões que a Ermis já respondeu chegam com ``handled``. Transcrição em dúvida (``guidance``
+        ``"misheard"``): a Ermis repete a pergunta uma vez; se a resposta vier de novo em dúvida, no motor 0.5.0 ela
+        segue para o seu código marcada (``handled`` falso, ``raw["uncertain"]`` e ``raw["uncertain_reasons"]`` com
+        ``"misheard_again"``), para você confirmar o dado ou transferir; ``"on_misheard_again": "end"`` no ``guard``
+        encerra a ligação (``give_up``), como até o 0.4.9. Sem custo de latência.
+
+        Latência × acurácia: as opções abaixo trocam tempo de resposta por acurácia. Cada uma diz quanto atrasa e
+        qual é o padrão (o do motor 0.5.0, a versão de produção).
+
+        ``end_of_turn`` (``"fast"``, ``"balanced"`` ou ``"patient"``; ver :data:`ermis.options.EndOfTurn`): quanto a
+        Ermis espera depois que o cliente para de falar. ``"fast"`` responde em 0,43 s, mas trata como fim 42% das
+        pausas de quem ia continuar; ``"balanced"`` (padrão no 0.5.0) **adiciona 0,16 s a todo turno** (23% das
+        pausas); ``"patient"`` **adiciona 0,37 s a todo turno** (9%). Até o 0.4.9 o padrão era ``"fast"``.
+
+        ``ask_again_on_ambiguous_stt``: quando o reconhecimento leu a fala de dois jeitos parecidos que mudam o
+        sentido ("quero calabresa" / "quero cala a breve"), a Ermis pergunta de novo em vez de seguir (a
+        ``Decision`` vem com ``guidance`` ``"misheard"`` e, em ``raw``, ``misheard_reason`` ``"stt_ambiguous"`` e
+        ``heard_alternatives``); a segunda dúvida seguida segue marcada no 0.5.0 (ver ``guard`` acima). Ela nunca
+        age sobre a outra leitura. **Adiciona latência**: +5 a +30 ms por turno (as N melhores leituras do
+        reconhecimento) e, nas falas com duas leituras, uma decisão a mais em paralelo (às vezes ~0,2 s de espera);
+        e **perguntas a mais** (8% das falas num teste offline; 2% dos turnos numa rodada de ligações de teste). ``None``: o padrão da versão do motor
+        (ligado no 0.4.9 e no 0.5.0). Desligada, a marca ``uncertain`` não tem os motivos ``stt_rival`` e
+        ``stt_ambiguous``.
         """
         body = session_body(
             transport=transport,
