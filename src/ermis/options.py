@@ -80,6 +80,17 @@ class VadOptions:
 
 Transport = Literal["twilio", "browser", "websocket"]
 AudioFormat = Literal["mulaw_8k", "pcm16_48k"]
+EndOfTurn = Literal["fast", "balanced", "patient"]
+"""Quanto a Ermis espera depois que o cliente para de falar, antes de responder (``end_of_turn``).
+
+Troca latência por acurácia; medido em fala humana ao telefone (português, 8 kHz):
+
+- ``"fast"`` (padrão): 0,43 s em média até o fim do turno; 42% das pausas de quem ia continuar viram fim de turno.
+- ``"balanced"``: **+0,16 s em todo turno** (0,60 s); 23% das pausas.
+- ``"patient"``: **+0,37 s em todo turno** (0,80 s); 9% das pausas.
+
+Os campos ``vad`` e ``early_turn`` que você mandar ganham do perfil.
+"""
 
 
 def session_body(
@@ -93,8 +104,8 @@ def session_body(
     transcription_priority: Literal["balanced", "latency", "accuracy", "local_first", "local_only"] = UNSET,
     precise_wait_ms: int = UNSET,
     turn_detection: Literal["smart_turn", "silence"] = UNSET,
-    end_of_turn: Literal["fast", "balanced", "patient"] = UNSET,
-    ask_again_on_ambiguous_stt: bool = UNSET,
+    end_of_turn: EndOfTurn = UNSET,
+    ask_again_on_ambiguous_stt: bool | None = UNSET,
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
     vocabulary: list[str] = UNSET,
@@ -105,7 +116,12 @@ def session_body(
     max_duration_s: int = UNSET,
     metadata: dict[str, Any] = UNSET,
 ) -> dict[str, Any]:
-    """Monta o corpo JSON de criação de sessão, sem os campos não informados."""
+    """Monta o corpo JSON de criação de sessão, sem os campos não informados.
+
+    ``end_of_turn``: ver :data:`EndOfTurn` (**adiciona latência** fora de ``"fast"``: +0,16 s ou +0,37 s por turno).
+    ``ask_again_on_ambiguous_stt``: ver ``Sessions.create`` (**adiciona latência**: +5 a +30 ms por turno, às vezes
+    uma decisão a mais, ~0,2 s, e perguntas a mais).
+    """
     raw = {
         "transport": transport,
         "audio_format": audio_format,

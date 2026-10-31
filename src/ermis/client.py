@@ -14,7 +14,16 @@ from websockets.exceptions import InvalidStatus
 from ._version import API_VERSION, USER_AGENT
 from .call import Call
 from .errors import APIError, AuthenticationError, InvalidRequestError, from_http
-from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
+from .options import (
+    UNSET,
+    AudioFormat,
+    BargeInOptions,
+    EndOfTurn,
+    Transport,
+    VadOptions,
+    WaitingOptions,
+    session_body,
+)
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
 # As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.9: o motor de voz): o SDK 0.4.9 fala com a Ermis Voice 0.4.9
@@ -101,8 +110,8 @@ class _Sessions:
         transcription_priority: str = UNSET,
         precise_wait_ms: int = UNSET,
         turn_detection: str = UNSET,
-        end_of_turn: str = UNSET,
-        ask_again_on_ambiguous_stt: bool = UNSET,
+        end_of_turn: EndOfTurn = UNSET,
+        ask_again_on_ambiguous_stt: bool | None = UNSET,
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
         vocabulary: list[str] = UNSET,
@@ -128,12 +137,22 @@ class _Sessions:
         ``local_first``, quanto uma resposta marcada como importante (``precise``, ``slot``) espera a leitura de
         maior precisão, em ms (padrão da API: 0, não espera).
 
-        ``end_of_turn`` (Ermis Voice API 0.4.9): quanto o agente espera numa pausa antes de responder.
-        ``"fast"`` (padrão) responde mais rápido; ``"balanced"`` (cerca de 0,16 s a mais por turno) e
-        ``"patient"`` (cerca de 0,37 s a mais) cortam menos quem faz pausas no meio da frase.
+        Latência × acurácia (Ermis Voice API 0.4.9): as duas opções abaixo trocam tempo de resposta por acurácia e
+        ficam no lado rápido por padrão.
 
-        ``ask_again_on_ambiguous_stt`` (Ermis Voice API 0.4.9, ligado por padrão): quando a fala pode ter sido
-        ouvida de duas formas com sentidos diferentes, a Ermis pergunta de novo em vez de seguir com uma delas.
+        ``end_of_turn`` (``"fast"``, ``"balanced"`` ou ``"patient"``; ver :data:`ermis.options.EndOfTurn`): quanto a
+        Ermis espera depois que o cliente para de falar. ``"fast"`` (padrão) responde em 0,43 s, mas trata como fim
+        42% das pausas de quem ia continuar; ``"balanced"`` **adiciona 0,16 s a todo turno** (23% das pausas);
+        ``"patient"`` **adiciona 0,37 s a todo turno** (9%).
+
+        ``ask_again_on_ambiguous_stt``: quando o reconhecimento leu a fala de dois jeitos parecidos que mudam o
+        sentido ("quero calabresa" / "quero cala a breve"), a Ermis pergunta de novo em vez de seguir (a
+        ``Decision`` vem com ``guidance`` ``"misheard"`` e, em ``raw``, ``misheard_reason`` ``"stt_ambiguous"`` e
+        ``heard_alternatives``); a segunda seguida encerra (``give_up`` do ``guard``). Ela nunca age sobre a outra
+        leitura. **Adiciona latência**: +5 a +30 ms por turno (as N melhores leituras do reconhecimento) e, nas
+        falas com duas leituras, uma decisão a mais em paralelo (às vezes ~0,2 s de espera); e **perguntas a
+        mais** (8% das falas num teste offline; 2% dos turnos numa rodada de ligações de teste). ``None``: o
+        padrão da versão do motor (ligado na 0.4.9).
 
         ``guard``: a Ermis responde sozinha a fala confusa, a divagação e a pergunta fora do tema, com as
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:

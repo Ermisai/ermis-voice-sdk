@@ -9,7 +9,8 @@ Requer a Ermis Voice API 0.4.9 (publique o SDK só depois dela). O SDK 0.4.9 fal
   pausas no meio da frase.
 - `sessions.create(ask_again_on_ambiguous_stt=...)`: no motor 0.4.9, quando a fala pode ter sido ouvida de duas
   formas com sentidos diferentes, a Ermis pergunta de novo em vez de seguir com uma delas (ligado por padrão;
-  `False` desliga).
+  `False` desliga; `None` usa o padrão da versão). Adiciona +5 a +30 ms por turno e algumas perguntas a mais.
+- Tipo `ermis.options.EndOfTurn` e documentação de quanto cada opção atrasa a resposta.
 
 ## 0.4.8
 
