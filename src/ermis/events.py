@@ -221,12 +221,24 @@ class SlotResult(Event):
     ``"readings_differ"``: o outro reconhecimento dá outro valor; ``"stt_rival"``: a leitura rival dá outro valor;
     ``"low_confidence"``) e ``raw["alternatives"]`` (``[{"value", "text", "source"}]``, os outros valores lidos). O
     ``value`` é sempre o ouvido pela leitura de maior qualidade: a Ermis não troca o valor. Sem custo de latência.
+
+    Motor 0.5.1 (``engine_version="0.5.1"``), no ``expect_slot``: a Ermis colhe o dado até ele estar pronto (espera o
+    resto, pede de novo o que não valida, lê de volta o que tem dúvida) e manda **um** ``SlotResult``; as ``Decision``
+    no caminho vêm com ``handled`` e ``raw["slot_pending"]`` (espere este resultado em vez de responder a elas).
+    Campos em ``raw``: ``readback`` (o valor em blocos, pronto para falar: "três nove zero, cinco três três, ..."),
+    ``candidates`` (``[{"value", "readback", "source"}]``, os valores que validam), ``confirmed`` (o cliente confirmou
+    a leitura de volta), ``source`` (``precise``, ``fast``, ``fast_nbest``, ``dtmf``, ``partial``), ``parts``
+    (endereço: ``street``, ``number``, ``neighbourhood``), ``joined`` (juntou falas), ``timeout`` (o resto não veio),
+    ``valid`` (``False`` com ``validate=False``). Novos motivos em ``uncertain_reasons``: ``"corrected"`` (a correção
+    que o cliente fez no meio), ``"nbest"`` (uma alternativa do reconhecimento), ``"misheard"``.
     """
 
     id: str
     value: Any
     status: str
-    """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido)."""
+    """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido). Motor 0.5.1, nos dados com
+    formato (cpf, cnpj, phone, cep, email, date): ``found`` só quando o valor valida; ``incomplete`` (faltou um
+    pedaço), ``invalid`` (completo, mas não valida) ou ``ambiguous`` (duas leituras validam: ``candidates``)."""
     revised: bool = False
     """Com prioridade de latência: o valor relido pelo reconhecimento de maior precisão, diferente do primeiro."""
     @property
@@ -358,6 +370,14 @@ class NoReply(Event):
 
 
 @dataclass(frozen=True)
+class Dtmf(Event):
+    """O cliente digitou uma tecla no telefone (0–9, ``*``, ``#``). Num ``expect_slot(..., dtmf=True)`` as teclas
+    também preenchem o dado (o ``SlotResult`` vem com ``raw["source"] == "dtmf"``)."""
+
+    digit: str
+
+
+@dataclass(frozen=True)
 class UnknownEvent(Event):
     """Evento que esta versão do SDK ainda não conhece. Veja ``raw``."""
 
@@ -426,6 +446,8 @@ def parse_event(msg: dict[str, Any]) -> Event:
         return SlotResult(
             t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised"))
         )
+    if t == "dtmf":
+        return Dtmf(t, msg, digit=str(g("digit") or ""))
     if t == "no_reply":
         return NoReply(t, msg, count=int(g("count") or 0), handled=bool(g("handled")), guided_text=g("guided_text"))
     if t == "transcript.revised":

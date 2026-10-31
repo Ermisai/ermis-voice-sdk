@@ -288,6 +288,11 @@ class Call:
 
     # transporte "websocket": o áudio passa pelo mesmo socket
 
+    async def dtmf(self, digit: str) -> None:
+        """Uma tecla que o cliente digitou ("0"–"9", "*", "#"), quando a sua telefonia a recebe (no Twilio a Ermis já
+        recebe direto). Chega como evento ``Dtmf`` e preenche um ``expect_slot(..., dtmf=True)``. Motor 0.5.1."""
+        await self.send({"type": "dtmf", "digit": digit})
+
     async def send_audio(self, frame: bytes) -> None:
         """Envia 20 ms de áudio μ-law 8 kHz (160 bytes). Só no transporte ``websocket``."""
         await self._ws.send(frame)
@@ -311,7 +316,9 @@ class Call:
         ou de um assunto fora do tema. ``choices``: as respostas esperadas (``CustomIntent(key, label,
         description)``); a ``Decision`` da resposta traz ``choice``, mesmo com a fala mal transcrita ou dita
         de outro jeito. ``precise``: a resposta sai do reconhecimento de maior precisão. ``slot``: o dado da
-        resposta, como em ``expect_slot`` (``("endereco", "address")``); o valor chega em ``Question.value``.
+        resposta, como em ``expect_slot`` (``("endereco", "address")``); o valor chega em ``Question.value``. Num
+        dicionário, as opções do ``expect_slot`` do motor 0.5.1 também valem (``{"name": "cpf", "type": "cpf",
+        "dtmf": True, "patience": "long"}``).
         """
         if self.ended is not None:
             raise ConnectionClosedError("a sessão já terminou")
@@ -345,7 +352,18 @@ class Call:
         await self.send({"type": "expect_precise"})
 
     async def expect_slot(
-        self, name: str, type: str = "text", *, description: str | None = None
+        self,
+        name: str,
+        type: str = "text",
+        *,
+        description: str | None = None,
+        patience: str | None = None,
+        validate: bool | None = None,
+        on_invalid: str | None = None,
+        confirm: bool | None = None,
+        backchannel: bool | None = None,
+        dtmf: bool | None = None,
+        fresh: bool | None = None,
     ) -> asyncio.Future[SlotResult]:
         """Avisa que a próxima resposta do cliente traz um dado (endereço, e-mail, CPF...).
 
@@ -359,12 +377,31 @@ class Call:
             ...
             # na Decision da resposta:
             resultado = await endereco
+
+        Motor 0.5.1: a Ermis colhe o dado até ele estar pronto e manda um só ``SlotResult``; as ``Decision`` no
+        caminho vêm com ``handled`` e ``raw["slot_pending"]``: espere o ``Future`` em vez de responder. Opções (todas
+        com o padrão da Ermis quando ``None``; o custo de latência de cada uma está em ``docs/latencia-acuracia.md``):
+
+        - ``patience``: ``"default"`` (não corta enquanto o valor está incompleto; CPF/CNPJ/CEP/telefone sem custo,
+          mais rápidos; e-mail +0,05 s; nome, endereço e texto **+1,2 s por resposta**), ``"long"`` (2 s em toda
+          pausa, +1,2 s) ou ``"off"`` (o ``end_of_turn`` da sessão);
+        - ``validate``: ``True`` onde há validador (cpf, cnpj, phone, cep, email, date); ``False`` aceita o valor lido;
+        - ``on_invalid``: ``"ask_again"`` (a Ermis pede de novo o que não valida e o resto que faltou; +1 turno só
+          nesses casos) ou ``"notify"`` (o ``SlotResult`` vem ``invalid``/``incomplete`` e você pede);
+        - ``confirm``: ``True`` lê de volta nome, endereço e o dado com dúvida e entende o sim/não (+1 turno, 3 a 5 s,
+          nesses dados); ``raw["confirmed"]`` diz se o cliente confirmou;
+        - ``backchannel``: ``True`` diz "uhum" baixinho nas pausas do ditado incompleto (sem latência);
+        - ``dtmf``: ``True`` aceita o dado digitado no teclado (``raw["source"] == "dtmf"``);
+        - ``fresh``: ``True`` esquece o que respostas anteriores disseram do dado.
         """
         if self.ended is not None:
             raise ConnectionClosedError("a sessão já terminou")
         slot: dict[str, Any] = {"name": name, "type": type}
         if description:
             slot["description"] = description
+        options = {"patience": patience, "validate": validate, "on_invalid": on_invalid, "confirm": confirm,
+                   "backchannel": backchannel, "dtmf": dtmf, "fresh": fresh}  # fmt: skip
+        slot.update({k: v for k, v in options.items() if v is not None})
         req_id = _new_id("e")
         fut: asyncio.Future[SlotResult] = asyncio.get_running_loop().create_future()
         self._pending[req_id] = fut
