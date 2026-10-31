@@ -164,6 +164,9 @@ class _Sessions:
         e **perguntas a mais** (8% das falas num teste offline; 2% dos turnos numa rodada de ligações de teste). ``None``: o padrão da versão do motor
         (ligado no 0.4.9 e no 0.5.0). Desligada, a marca ``uncertain`` não tem os motivos ``stt_rival`` e
         ``stt_ambiguous``.
+        **Recomendado desligar para público idoso ou que hesita muito**: na validação do 0.5.0, sem ela o
+        objetivo cumprido subiu 10 pontos e o fim certo 18 nesse público (repetir a pergunta atrapalha quem já
+        fala devagar); nesse caso use também ``end_of_turn="patient"``.
         """
         body = session_body(
             transport=transport,
