@@ -712,3 +712,15 @@ async def test_every_request_says_the_sdk_version():
     client = _client(handler)
     await client.balance()
     assert seen == [f"ermis-voice-python/{ermis.__version__}"]
+
+
+def test_slot_failed_with_reason_heard_and_attempts():
+    from ermis import SLOT_FAILURE_REASONS, SlotResult, parse_event
+
+    ev = parse_event({"type": "slot", "id": "q1", "value": "39053344706", "status": "failed", "reason": "invalid",
+                      "value_status": "invalid", "heard": ["três nove zero", "três nove zero"], "attempts": 2})
+    assert isinstance(ev, SlotResult) and ev.failed and not ev.found
+    assert ev.reason == "invalid" in SLOT_FAILURE_REASONS and ev.heard == ("três nove zero", "três nove zero")
+    assert ev.attempts == 2 and ev.raw["value_status"] == "invalid"
+    ok = parse_event({"type": "slot", "id": "q2", "value": "x", "status": "found"})
+    assert ok.found and not ok.failed and ok.reason is None and ok.heard == () and ok.attempts == 0

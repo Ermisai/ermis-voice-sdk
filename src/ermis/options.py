@@ -117,6 +117,7 @@ def session_body(
     waiting: WaitingOptions | dict[str, Any] = UNSET,
     max_duration_s: int = UNSET,
     metadata: dict[str, Any] = UNSET,
+    dtmf: bool | None = UNSET,
 ) -> dict[str, Any]:
     """Monta o corpo JSON de criação de sessão, sem os campos não informados.
 
@@ -148,6 +149,7 @@ def session_body(
         "waiting": waiting,
         "max_duration_s": max_duration_s,
         "metadata": metadata,
+        "dtmf": dtmf,
     }
     body: dict[str, Any] = {}
     for key, value in raw.items():

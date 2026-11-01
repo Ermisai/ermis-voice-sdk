@@ -360,7 +360,8 @@ class Call:
         patience: str | None = None,
         validate: bool | None = None,
         on_invalid: str | None = None,
-        confirm: bool | None = None,
+        confirm: bool | str | None = None,
+        confirm_listen: str | None = None,
         backchannel: bool | None = None,
         dtmf: bool | None = None,
         fresh: bool | None = None,
@@ -383,16 +384,23 @@ class Call:
         com o padrão da Ermis quando ``None``; o custo de latência de cada uma está em ``docs/latencia-acuracia.md``):
 
         - ``patience``: ``"default"`` (não corta enquanto o valor está incompleto; CPF/CNPJ/CEP/telefone sem custo,
-          mais rápidos; e-mail +0,05 s; nome, endereço e texto **+1,2 s por resposta**), ``"long"`` (2 s em toda
-          pausa, +1,2 s) ou ``"off"`` (o ``end_of_turn`` da sessão);
+          mais rápidos; e-mail +0,05 s; nome, endereço e texto com o ``end_of_turn`` da sessão), ``"long"`` (2 s em
+          toda pausa: **+1,5 s por resposta** de nome ou endereço, para quem soletra devagar) ou ``"off"`` (o
+          ``end_of_turn`` da sessão em qualquer tipo; o telefone ditado em partes é pedido de novo o dobro);
         - ``validate``: ``True`` onde há validador (cpf, cnpj, phone, cep, email, date); ``False`` aceita o valor lido;
         - ``on_invalid``: ``"ask_again"`` (a Ermis pede de novo o que não valida e o resto que faltou; +1 turno só
-          nesses casos) ou ``"notify"`` (o ``SlotResult`` vem ``invalid``/``incomplete`` e você pede);
-        - ``confirm``: ``True`` lê de volta nome, endereço e o dado com dúvida e entende o sim/não (+1 turno, 3 a 5 s,
-          nesses dados); ``raw["confirmed"]`` diz se o cliente confirmou;
+          nesses casos) ou ``"notify"`` (o ``SlotResult`` vem ``failed`` e você pede);
+        - ``confirm``: ``"all"``/``True`` (padrão) lê de volta nome, endereço e o dado com dúvida e entende o sim/não
+          (+1 turno, 3 a 5 s, nesses dados); ``"uncertain"`` só o dado com dúvida (menos leituras, mas o nome aceito
+          errado foi de 10% para 22% na bateria); ``False`` nenhum; ``raw["confirmed"]`` diz se o cliente confirmou;
+        - ``confirm_listen``: ``"sensitive"`` (padrão) ouve o "Isso." curto depois da leitura de volta numa linha com
+          ruído (ligações com "Você ainda está aí?" 30% → 22%, sem latência); ``"normal"``;
         - ``backchannel``: ``True`` diz "uhum" baixinho nas pausas do ditado incompleto (sem latência);
         - ``dtmf``: ``True`` aceita o dado digitado no teclado (``raw["source"] == "dtmf"``);
         - ``fresh``: ``True`` esquece o que respostas anteriores disseram do dado.
+
+        Quando o dado não sai, o ``SlotResult`` vem com ``failed`` e ``reason`` (``SLOT_FAILURE_REASONS``), ``heard``
+        e ``attempts``. A Ermis não encerra nem transfere por isso: ofereça o teclado, transfira ou siga sem o dado.
         """
         if self.ended is not None:
             raise ConnectionClosedError("a sessão já terminou")
@@ -400,7 +408,7 @@ class Call:
         if description:
             slot["description"] = description
         options = {"patience": patience, "validate": validate, "on_invalid": on_invalid, "confirm": confirm,
-                   "backchannel": backchannel, "dtmf": dtmf, "fresh": fresh}  # fmt: skip
+                   "confirm_listen": confirm_listen, "backchannel": backchannel, "dtmf": dtmf, "fresh": fresh}  # fmt: skip
         slot.update({k: v for k, v in options.items() if v is not None})
         req_id = _new_id("e")
         fut: asyncio.Future[SlotResult] = asyncio.get_running_loop().create_future()

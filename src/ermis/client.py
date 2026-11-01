@@ -121,6 +121,7 @@ class _Sessions:
         waiting: WaitingOptions | dict[str, Any] = UNSET,
         max_duration_s: int = UNSET,
         metadata: dict[str, Any] = UNSET,
+        dtmf: bool | None = UNSET,
     ) -> Session:
         """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
 
@@ -167,6 +168,11 @@ class _Sessions:
         **Recomendado desligar para público idoso ou que hesita muito**: na validação do 0.5.0, sem ela o
         objetivo cumprido subiu 10 pontos e o fim certo 18 nesse público (repetir a pergunta atrapalha quem já
         fala devagar); nesse caso use também ``end_of_turn="patient"``.
+
+        ``dtmf`` (motor 0.5.1): as teclas do cliente chegam à Ermis. No Twilio, sempre (padrão); no ``websocket`` e
+        no navegador, diga ``True`` quando a sua telefonia manda as teclas (``call.dtmf()``), ou elas valem a partir
+        da primeira tecla. Um ``expect_slot`` com ``dtmf=True`` numa sessão sem teclado falha na hora
+        (``SlotResult.reason == "dtmf_unavailable"``).
         """
         body = session_body(
             transport=transport,
@@ -189,6 +195,7 @@ class _Sessions:
             waiting=waiting,
             max_duration_s=max_duration_s,
             metadata=metadata,
+            dtmf=dtmf,
         )
         data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(

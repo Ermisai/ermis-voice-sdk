@@ -212,6 +212,11 @@ class Decision(Event):
         )
 
 
+# Motor 0.5.1: por que um slot de expect_slot falhou (SlotResult.reason com status "failed")
+SLOT_FAILURE_REASONS = ("invalid", "incomplete", "timeout", "not_found", "off_topic", "escape", "denied", "unconfirmed",
+                        "no_answer", "keypad_timeout", "dtmf_unavailable")
+
+
 @dataclass(frozen=True)
 class SlotResult(Event):
     """Resposta de ``call.extract_slot()`` (e o valor de ``expect_slot`` / ``ask(..., slot=...)``).
@@ -237,13 +242,46 @@ class SlotResult(Event):
     value: Any
     status: str
     """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido). Motor 0.5.1, nos dados com
-    formato (cpf, cnpj, phone, cep, email, date): ``found`` só quando o valor valida; ``incomplete`` (faltou um
-    pedaço), ``invalid`` (completo, mas não valida) ou ``ambiguous`` (duas leituras validam: ``candidates``)."""
+    formato (cpf, cnpj, phone, cep, email, date), no ``extract_slot``: ``found`` só quando o valor valida;
+    ``incomplete`` (faltou um pedaço), ``invalid`` (completo, mas não valida) ou ``ambiguous`` (duas leituras validam:
+    ``candidates``).
+
+    Motor 0.5.1, no ``expect_slot``/``ask(..., slot=...)``: ``found``, ``ambiguous`` (só com ``confirm=False``) ou
+    ``failed``: o dado não saiu, e ``reason`` diz por quê. A Ermis nunca encerra nem transfere por isso: o que fazer
+    (oferecer o teclado, passar para um atendente, seguir sem o dado) é regra do seu negócio."""
     revised: bool = False
     """Com prioridade de latência: o valor relido pelo reconhecimento de maior precisão, diferente do primeiro."""
+    reason: str | None = None
+    """Motor 0.5.1, com ``status == "failed"``: por que o dado não saiu (``SLOT_FAILURE_REASONS``):
+
+    - ``invalid``: o que veio não valida (CPF com dígito errado, telefone sem DDD válido), mesmo depois de a Ermis
+      pedir de novo; também as teclas terminadas com ``#`` que não formam o dado;
+    - ``incomplete``: faltou um pedaço e o turno acabou;
+    - ``timeout``: veio parte do dado e o resto não veio (a Ermis já pediu o resto uma vez);
+    - ``not_found``: a resposta não tinha esse dado ("não lembro agora");
+    - ``off_topic``: a resposta era sobre outra coisa;
+    - ``escape``: o cliente pediu um atendente no meio;
+    - ``denied``: a Ermis leu de volta e o cliente disse que não (depois de pedir de novo uma vez);
+    - ``unconfirmed``: a Ermis leu de volta e o cliente não disse nem sim nem não, duas vezes (``value`` é o ouvido,
+      sem confirmação);
+    - ``no_answer``: o cliente não respondeu (o último ``no_reply`` do guard);
+    - ``keypad_timeout``: o cliente começou a digitar e parou (5 s sem tecla) sem completar o dado;
+    - ``dtmf_unavailable``: o slot pediu o teclado (``dtmf=True``) numa sessão que não recebe teclas (fora do Twilio,
+      diga ``dtmf=True`` ao criar a sessão); vem na hora, e a resposta por voz chega como uma ``Decision`` comum."""
+    heard: tuple[str, ...] = ()
+    """Motor 0.5.1: o que o cliente disse para esse dado, resposta por resposta (o texto ouvido; as teclas, no
+    teclado). Bom para o log e para passar ao atendente."""
+    attempts: int = 0
+    """Motor 0.5.1: quantas respostas o dado levou (``len(heard)``)."""
+
     @property
     def found(self) -> bool:
         return self.status == "found"
+
+    @property
+    def failed(self) -> bool:
+        """Motor 0.5.1: o dado não saiu (``reason`` diz por quê)."""
+        return self.status == "failed"
 
 
 @dataclass(frozen=True)
@@ -444,7 +482,8 @@ def parse_event(msg: dict[str, Any]) -> Event:
         )
     if t == "slot":
         return SlotResult(
-            t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised"))
+            t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised")),
+            reason=g("reason"), heard=tuple(g("heard") or ()), attempts=int(g("attempts") or 0),
         )
     if t == "dtmf":
         return Dtmf(t, msg, digit=str(g("digit") or ""))
