@@ -19,6 +19,7 @@ from .options import (
     AudioFormat,
     BargeInOptions,
     EndOfTurn,
+    Profile,
     Transport,
     VadOptions,
     WaitingOptions,
@@ -124,6 +125,8 @@ class _Sessions:
         dtmf: bool | None = UNSET,
         echo: dict[str, Any] = UNSET,
         monitoring: bool = UNSET,
+        profile: Profile = UNSET,
+        hotwords_in_stt: bool | None = UNSET,
     ) -> Session:
         """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
 
@@ -185,6 +188,28 @@ class _Sessions:
         ditados, interrupções, qualidade da linha). Leia com :meth:`monitoring`, :meth:`monitoring_audio` e
         :meth:`monitoring_transcript`, ou na página Ligações da plataforma. ``False``: nada desta ligação fica
         guardado (use nas ligações que não podem ser gravadas). Sem custo de latência.
+
+        ``profile`` (motor 0.5.3; ``"latency"``, ``"balanced"`` ou ``"accuracy"``; ver :data:`ermis.options.Profile`):
+        escolhe de uma vez ``end_of_turn``, ``transcription_priority``, ``precise_wait_ms`` e ``early_turn``. Os
+        campos que você mandar ganham dele.
+
+        ``early_turn``: no motor 0.5.3 o padrão é ``{"speculate": True}``: a transcrição e a decisão começam na pausa
+        do cliente e são descartadas se ele voltar a falar. **Sem custo de latência** (ela cai: −0,26 s por turno na
+        bateria, −0,37 a −0,42 s na CPU da produção) **nem de acurácia** (a fala que continua nunca usa esse trabalho,
+        e o turno espera quando o texto da pausa termina aberto); o custo é processamento (as transcrições e decisões
+        das pausas em que o cliente continua: ~2 transcrições e ~1 decisão por minuto de ligação).
+        ``{"speculate": False}`` desliga. ``close_on_complete_text`` continua desligado por padrão (nenhum ganho de
+        latência medido sobre a especulação, e mais cortes em fala humana).
+
+        ``hotwords_in_stt`` (motor 0.5.3; padrão desligado): o ``vocabulary`` também orienta o reconhecimento
+        rápido, que prefere a leitura com o termo quando o áudio a sustenta (nunca escreve um termo que o áudio não
+        sustenta). Num teste offline, o termo certo subiu 8 a 13 pontos sobre a correção do vocabulário sozinha; na
+        CPU da produção, WER 9,2% → 6,5%. **Adiciona ~0,29 s por turno** na CPU da produção (o reconhecimento lê o
+        arquivo da fala com um beam) e ainda não vale nos caminhos em streaming. Vale sobretudo com
+        ``transcription_priority="latency"``, em que o texto do turno é o do reconhecimento rápido.
+
+        ``ask_again_on_ambiguous_stt``, na CPU da produção: as N leituras custam ~0,2 s por turno quando o
+        reconhecimento rápido lê o arquivo da fala (+26 ms em streaming).
         """
         body = session_body(
             transport=transport,
@@ -210,6 +235,8 @@ class _Sessions:
             dtmf=dtmf,
             echo=echo,
             monitoring=monitoring,
+            profile=profile,
+            hotwords_in_stt=hotwords_in_stt,
         )
         data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(
