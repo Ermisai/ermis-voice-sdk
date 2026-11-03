@@ -26,7 +26,7 @@ from .options import (
 )
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
-# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.4.9: o motor de voz): o SDK 0.4.9 fala com a Ermis Voice 0.4.9
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.5.2: o motor de voz): o SDK 0.5.2 fala com a Ermis Voice 0.5.2
 VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 
@@ -122,6 +122,8 @@ class _Sessions:
         max_duration_s: int = UNSET,
         metadata: dict[str, Any] = UNSET,
         dtmf: bool | None = UNSET,
+        echo: dict[str, Any] = UNSET,
+        monitoring: bool = UNSET,
     ) -> Session:
         """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
 
@@ -173,6 +175,16 @@ class _Sessions:
         no navegador, diga ``True`` quando a sua telefonia manda as teclas (``call.dtmf()``), ou elas valem a partir
         da primeira tecla. Um ``expect_slot`` com ``dtmf=True`` numa sessão sem teclado falha na hora
         (``SlotResult.reason == "dtmf_unavailable"``).
+
+        ``echo`` (motor 0.5.2, ligado por padrão nele): a voz do próprio agente voltando pela linha (navegador sem
+        cancelamento de eco, viva-voz) não interrompe o agente; o cliente falando por cima continua interrompendo.
+        ``{"enabled": False}`` desliga. Sem custo de latência.
+
+        ``monitoring`` (todas as versões, padrão ``True``): quando a ligação termina, a Ermis guarda o áudio em dois
+        canais (cliente e agente), a conversa, os eventos e as métricas (latência de cada etapa, entendimento, dados
+        ditados, interrupções, qualidade da linha). Leia com :meth:`monitoring`, :meth:`monitoring_audio` e
+        :meth:`monitoring_transcript`, ou na página Ligações da plataforma. ``False``: nada desta ligação fica
+        guardado (use nas ligações que não podem ser gravadas). Sem custo de latência.
         """
         body = session_body(
             transport=transport,
@@ -196,6 +208,8 @@ class _Sessions:
             max_duration_s=max_duration_s,
             metadata=metadata,
             dtmf=dtmf,
+            echo=echo,
+            monitoring=monitoring,
         )
         data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(
@@ -213,6 +227,28 @@ class _Sessions:
     async def end(self, session_id: str) -> None:
         """Encerra a sessão pelo REST (o mesmo que ``call.end()`` no canal de controle)."""
         await self._client._request("DELETE", f"{VOICE_PATH}/sessions/{session_id}")
+
+    async def monitoring(self, session_id: str) -> dict[str, Any]:
+        """O que a ligação guardou (``monitoring``), depois que ela terminou: ``metrics`` e ``conversation``.
+
+        ``metrics``: ``call`` (duração, créditos, motivo do fim), ``talk`` (fala de cada lado, silêncio), ``turns``,
+        ``latency_ms`` (cada etapa: ``count``, ``mean``, ``p50``, ``p90``, ``max``), ``understanding``, ``slots``,
+        ``interruptions``, ``waiting``, ``line``, ``dtmf``, ``errors``. ``conversation``: as falas, com ``t`` (segundos
+        desde o início do áudio), ``speaker`` (``"caller"`` ou ``"agent"``) e ``text``. Sessão ainda em andamento:
+        ``APIError`` com ``status`` 409; sem monitoramento, ou de outra chave: ``status`` 404.
+        """
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring")
+
+    async def monitoring_audio(self, session_id: str) -> bytes:
+        """O áudio da ligação: WAV, 8 kHz, dois canais (esquerda: o cliente; direita: o agente)."""
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring/audio.wav", raw=True)
+
+    async def monitoring_transcript(self, session_id: str) -> str:
+        """A conversa em texto, uma linha por fala, com o tempo (``[00:03.90] Cliente: ...``)."""
+        data = await self._client._request(
+            "GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring/conversation.txt", raw=True
+        )
+        return data.decode("utf-8")
 
 
 class Ermis:
@@ -255,7 +291,7 @@ class Ermis:
         # O User-Agent diz a versão do SDK: numa rota de outra versão, a API responde qual instalar
         return {"Authorization": f"Bearer {self.api_key}", "User-Agent": USER_AGENT}
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _request(self, method: str, path: str, *, raw: bool = False, **kwargs: Any) -> Any:
         try:
             resp = await self._http.request(method, path, headers=self._auth(), **kwargs)
         except httpx.TransportError as exc:  # endereço errado, sem rede, DNS: diz onde tentou e o que conferir
@@ -272,6 +308,8 @@ class Ermis:
             except ValueError:
                 message = resp.text
             raise from_http(resp.status_code, message, code=code, request_id=resp.headers.get("x-request-id"))
+        if raw:
+            return resp.content
         return resp.json() if resp.content else None
 
     async def usage(self, *, limit: int = 50, before: int | None = None) -> dict[str, Any]:

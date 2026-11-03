@@ -22,6 +22,7 @@ from .errors import (
     SessionTimeoutError,
 )
 from .events import (
+    SLOT_FAILURE_REASONS,
     Assessment,
     Audio,
     BargeIn,
@@ -34,7 +35,6 @@ from .events import (
     ReplyTimeout,
     SessionEnded,
     SessionStarted,
-    SLOT_FAILURE_REASONS,
     SlotResult,
     SpeakDone,
     SpeakStarted,

@@ -678,7 +678,7 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
     assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
-    # The voice routes of this SDK's version: SDK 0.4.9 talks to Ermis Voice 0.4.9
+    # The voice routes of this SDK's version: SDK 0.5.2 talks to Ermis Voice 0.5.2
     from ermis.client import VOICE_PATH
 
     assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH
@@ -717,10 +717,51 @@ async def test_every_request_says_the_sdk_version():
 def test_slot_failed_with_reason_heard_and_attempts():
     from ermis import SLOT_FAILURE_REASONS, SlotResult, parse_event
 
-    ev = parse_event({"type": "slot", "id": "q1", "value": "39053344706", "status": "failed", "reason": "invalid",
-                      "value_status": "invalid", "heard": ["três nove zero", "três nove zero"], "attempts": 2})
+    ev = parse_event(
+        {
+            "type": "slot",
+            "id": "q1",
+            "value": "39053344706",
+            "status": "failed",
+            "reason": "invalid",
+            "value_status": "invalid",
+            "heard": ["três nove zero", "três nove zero"],
+            "attempts": 2,
+        }
+    )
     assert isinstance(ev, SlotResult) and ev.failed and not ev.found
     assert ev.reason == "invalid" in SLOT_FAILURE_REASONS and ev.heard == ("três nove zero", "três nove zero")
     assert ev.attempts == 2 and ev.raw["value_status"] == "invalid"
     ok = parse_event({"type": "slot", "id": "q2", "value": "x", "status": "found"})
     assert ok.found and not ok.failed and ok.reason is None and ok.heard == () and ok.attempts == 0
+
+
+async def test_monitoring_option_and_reading_a_call_back():
+    from ermis.options import session_body
+
+    assert session_body(monitoring=False, echo={"enabled": False}) == {"monitoring": False, "echo": {"enabled": False}}
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        if request.url.path.endswith("/monitoring"):
+            return httpx.Response(200, json={"metrics": {"turns": {"caller": 1}}, "conversation": []})
+        if request.url.path.endswith("audio.wav"):
+            return httpx.Response(200, content=b"RIFF....WAVE", headers={"content-type": "audio/wav"})
+        return httpx.Response(200, content=b"[00:01.00] Cliente: oi\n", headers={"content-type": "text/plain"})
+
+    client = _client(handler)
+    assert (await client.sessions.monitoring("vs_1"))["metrics"]["turns"]["caller"] == 1
+    assert await client.sessions.monitoring_audio("vs_1") == b"RIFF....WAVE"
+    assert await client.sessions.monitoring_transcript("vs_1") == "[00:01.00] Cliente: oi\n"
+    base = f"/v1/voice/v{API_VERSION}/sessions/vs_1/monitoring"
+    assert seen == [base, base + "/audio.wav", base + "/conversation.txt"]
+
+
+async def test_monitoring_of_a_running_call_is_an_api_error_409():
+    from ermis import APIError
+
+    client = _client(lambda request: httpx.Response(409, json={"error": "conflict", "message": "not ended"}))
+    with pytest.raises(APIError) as caught:
+        await client.sessions.monitoring("vs_1")
+    assert caught.value.status == 409

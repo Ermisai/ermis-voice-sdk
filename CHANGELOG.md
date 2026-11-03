@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.2
+
+Requer a Ermis Voice API 0.5.2 (publique o SDK só depois dela). O SDK 0.5.2 fala com `/v1/voice/v0.5.2/...`.
+
+- **Monitoramento das ligações** (`sessions.create(monitoring=...)`, padrão `True`): ao fim da ligação a Ermis guarda
+  o áudio em dois canais, a conversa e as métricas. `ermis.sessions.monitoring(session_id)` (`metrics` e
+  `conversation`), `monitoring_audio()` (WAV) e `monitoring_transcript()` (texto); na plataforma, a página Ligações.
+  `False`: nada fica guardado.
+- `sessions.create(echo=...)` (motor 0.5.2): o eco do próprio agente na linha não o interrompe (ligado por padrão
+  na 0.5.2; `{"enabled": False}` desliga).
+- Motor 0.5.1, ditado: `expect_slot` com `patience`, `validate`, `on_invalid`, `confirm`, `confirm_listen`,
+  `backchannel`, `dtmf` e `fresh`; `SlotResult` com `status` `failed`, `reason` (`SLOT_FAILURE_REASONS`), `heard`,
+  `attempts`, `readback`, `candidates` e `confirmed`; o evento `Dtmf` e `call.dtmf()`; `sessions.create(dtmf=...)`.
+- Motor 0.5.0: `end_of_turn` `"balanced"` por padrão; `guard.on_misheard_again` (a segunda dúvida segue marcada);
+  `uncertain` e `uncertain_reasons` nas decisões e nos dados.
+- Pula da 0.4.9 para a 0.5.2 para alinhar com o motor (0.5.0 e 0.5.1 foram versões só do motor).
+
 ## 0.4.9
 
 Requer a Ermis Voice API 0.4.9 (publique o SDK só depois dela). O SDK 0.4.9 fala com `/v1/voice/v0.4.9/...`.

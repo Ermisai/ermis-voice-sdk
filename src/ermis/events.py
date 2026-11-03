@@ -213,8 +213,19 @@ class Decision(Event):
 
 
 # Motor 0.5.1: por que um slot de expect_slot falhou (SlotResult.reason com status "failed")
-SLOT_FAILURE_REASONS = ("invalid", "incomplete", "timeout", "not_found", "off_topic", "escape", "denied", "unconfirmed",
-                        "no_answer", "keypad_timeout", "dtmf_unavailable")
+SLOT_FAILURE_REASONS = (
+    "invalid",
+    "incomplete",
+    "timeout",
+    "not_found",
+    "off_topic",
+    "escape",
+    "denied",
+    "unconfirmed",
+    "no_answer",
+    "keypad_timeout",
+    "dtmf_unavailable",
+)
 
 
 @dataclass(frozen=True)
@@ -482,8 +493,15 @@ def parse_event(msg: dict[str, Any]) -> Event:
         )
     if t == "slot":
         return SlotResult(
-            t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised")),
-            reason=g("reason"), heard=tuple(g("heard") or ()), attempts=int(g("attempts") or 0),
+            t,
+            msg,
+            id=g("id", ""),
+            value=g("value"),
+            status=g("status", "not_found"),
+            revised=bool(g("revised")),
+            reason=g("reason"),
+            heard=tuple(g("heard") or ()),
+            attempts=int(g("attempts") or 0),
         )
     if t == "dtmf":
         return Dtmf(t, msg, digit=str(g("digit") or ""))
