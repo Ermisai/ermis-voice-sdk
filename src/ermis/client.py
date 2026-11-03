@@ -27,7 +27,7 @@ from .options import (
 )
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
-# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.5.2: o motor de voz): o SDK 0.5.2 fala com a Ermis Voice 0.5.2
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.5.3: o motor de voz): o SDK 0.5.3 fala com a Ermis Voice 0.5.3
 VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 
@@ -127,6 +127,7 @@ class _Sessions:
         monitoring: bool = UNSET,
         profile: Profile = UNSET,
         hotwords_in_stt: bool | None = UNSET,
+        guardrails: dict[str, Any] = UNSET,
     ) -> Session:
         """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
 
@@ -208,6 +209,13 @@ class _Sessions:
         arquivo da fala com um beam) e ainda não vale nos caminhos em streaming. Vale sobretudo com
         ``transcription_priority="latency"``, em que o texto do turno é o do reconhecimento rápido.
 
+        ``guardrails`` (motor 0.5.3; desligado por padrão): checagens da fala do cliente e das falas do agente. Ex.:
+        ``{"business": "Pizzaria", "caller": {"checks": ["injection", "abuse"]}, "agent": {"mode": "block",
+        "rules": ["Nunca prometa desconto"]}, "fallback": "Nisso não consigo ajudar."}``. As do cliente vão na mesma
+        avaliação da decisão (**sem latência a mais**) e chegam em ``Decision.guardrails``; as do agente, em
+        ``"audit"``, só avisam (evento :class:`ermis.Guardrail`), e em ``"block"`` checam antes de tocar (**~0,2 s a
+        mais por fala checada**) e trocam a fala reprovada pelo ``fallback``. ``speak(check=False)`` pula uma fala.
+
         ``ask_again_on_ambiguous_stt``, na CPU da produção: as N leituras custam ~0,2 s por turno quando o
         reconhecimento rápido lê o arquivo da fala (+26 ms em streaming).
         """
@@ -237,6 +245,7 @@ class _Sessions:
             monitoring=monitoring,
             profile=profile,
             hotwords_in_stt=hotwords_in_stt,
+            guardrails=guardrails,
         )
         data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(

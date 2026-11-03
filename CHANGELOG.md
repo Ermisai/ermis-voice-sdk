@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.3
+
+Requer a Ermis Voice API 0.5.3 (publique o SDK só depois dela). O SDK 0.5.3 fala com `/v1/voice/v0.5.3/...`.
+
+- **Guardrails** (`sessions.create(guardrails=...)`): checagens da fala do cliente, que chegam em
+  `Decision.guardrails` sem latência a mais, e das falas do agente, em `audit` (o evento `Guardrail` avisa) ou `block`
+  (a fala reprovada vira a frase `fallback`; ~0,2 s a mais por fala checada). `call.speak(..., check=False)` pula a
+  checagem de uma fala fixa do roteiro.
+- `sessions.create(profile=...)`: `"latency"`, `"balanced"` ou `"accuracy"` (tipo `ermis.options.Profile`).
+- `sessions.create(hotwords_in_stt=...)`: o vocabulário também orienta o reconhecimento rápido (~0,29 s por turno).
+- No motor 0.5.3 a transcrição e a decisão começam na pausa do cliente (`early_turn.speculate` ligado por padrão).
+
 ## 0.5.2
 
 Requer a Ermis Voice API 0.5.2 (publique o SDK só depois dela). O SDK 0.5.2 fala com `/v1/voice/v0.5.2/...`.

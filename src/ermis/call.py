@@ -191,6 +191,7 @@ class Call:
         allow_barge_in: bool | None = None,
         calibrate: bool | None = None,
         normalize: bool | None = None,
+        check: bool | None = None,
     ) -> str:
         """O agente fala ``text``. Devolve o ``id`` da fala na hora, sem esperar o áudio terminar.
 
@@ -198,12 +199,19 @@ class Call:
         - ``allow_barge_in=False`` para avisos que não podem ser interrompidos.
         - ``normalize``: escreve o texto do jeito que se fala ("R$ 49,90" -> "quarenta e nove reais e noventa
           centavos"); padrão do ``connect(..., normalize_text=True)``.
+        - ``check=False``: com os guardrails da fala do agente ligados (``guardrails={"agent": ...}``), esta fala não
+          é checada (uma frase fixa do roteiro, que você já sabe que está certa).
         """
         if self.normalize_text if normalize is None else normalize:
             text = normalize_for_speech(text)
         speak_id = id or _new_id("r")
         msg: dict[str, Any] = {"type": "speak", "id": speak_id, "text": text}
-        for key, value in (("voice", voice), ("allow_barge_in", allow_barge_in), ("calibrate", calibrate)):
+        for key, value in (
+            ("voice", voice),
+            ("allow_barge_in", allow_barge_in),
+            ("calibrate", calibrate),
+            ("check", check),
+        ):
             if value is not None:
                 msg[key] = value
         await self.send(msg)

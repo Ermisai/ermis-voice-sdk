@@ -114,6 +114,13 @@ class Decision(Event):
     """Com ``ask(..., choices=...)``: a resposta esperada que o cliente quis dizer, ou ``"none"``."""
     choice_confidence: float | None = None
 
+    @property
+    def guardrails(self) -> dict[str, Any]:
+        """Os guardrails da fala do cliente (``guardrails={"caller": ...}``, motor 0.5.3): ``fired`` (as checagens que
+        dispararam: ``injection``, ``authority_claim``, ``abuse``, ``sensitive_data``, ``rule_1``…) e ``scores``.
+        Vazio quando a sessão não os pediu."""
+        return self.raw.get("guardrails") or {}
+
     def chosen(self, min_confidence: float = 0.8) -> str | None:
         """A resposta esperada escolhida, quando a escolha é segura; ``None`` quando não é."""
         if not self.choice or self.choice == "none":
@@ -419,6 +426,23 @@ class NoReply(Event):
 
 
 @dataclass(frozen=True)
+class Guardrail(Event):
+    """Um guardrail da fala do agente disparou (``guardrails={"agent": ...}``, motor 0.5.3).
+
+    ``blocked``: no modo ``block``, a fala ``id`` não tocou e o agente disse a frase ``fallback`` da sessão; no modo
+    ``audit``, a fala tocou e isto é só o aviso. ``fired``: as checagens que dispararam (``offensive``,
+    ``professional_advice``, ``third_party_data``, ``instructions_leak``, ``rule_1``…); ``rules``: o texto das
+    regras do seu negócio que dispararam; ``scores``: a probabilidade de cada checagem. ``error``: a checagem
+    falhou ou demorou mais de 1,2 s, e a fala tocou."""
+
+    id: str | None
+    blocked: bool
+    fired: tuple[str, ...]
+    rules: dict[str, str]
+    scores: dict[str, float]
+    error: str | None = None
+
+
 class Dtmf(Event):
     """O cliente digitou uma tecla no telefone (0–9, ``*``, ``#``). Num ``expect_slot(..., dtmf=True)`` as teclas
     também preenchem o dado (o ``SlotResult`` vem com ``raw["source"] == "dtmf"``)."""
@@ -470,6 +494,17 @@ def parse_event(msg: dict[str, Any]) -> Event:
             latency_ms=g("latency_ms"),
             corrections=list(g("corrections") or []),
             handled=bool(g("handled")),
+        )
+    if t == "guardrail":
+        return Guardrail(
+            t,
+            msg,
+            id=g("id"),
+            blocked=bool(g("blocked")),
+            fired=tuple(g("fired") or ()),
+            rules=dict(g("rules") or {}),
+            scores=dict(g("scores") or {}),
+            error=g("error"),
         )
     if t == "decision":
         return Decision(

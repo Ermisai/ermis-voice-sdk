@@ -16,6 +16,7 @@ Tudo roda na Ermis: detecção de fala, transcrição, decisões e voz. Você pa
 - [Enquanto a sua IA pensa](#enquanto-a-sua-ia-pensa)
 - [Conectando a sua IA](#conectando-a-sua-ia)
 - [Conectando o áudio](#conectando-o-áudio)
+- [Guardrails](#guardrails)
 - [Monitoramento das ligações](#monitoramento-das-ligações)
 - [Erros e limites](#erros-e-limites)
 - [Boas práticas](#boas-práticas)
@@ -31,7 +32,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 **2. Quando a ligação chegar, crie uma sessão:**
 
 ```bash
-curl https://voice-api.live.ermis.ai/v1/voice/v0.5.2/sessions \
+curl https://voice-api.live.ermis.ai/v1/voice/v0.5.3/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
@@ -40,8 +41,8 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.5.2/sessions \
 ```json
 {
   "session_id": "vs_8f2c1a",
-  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.2/twilio",
-  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.2/sessions/vs_8f2c1a/control",
+  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/twilio",
+  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/sessions/vs_8f2c1a/control",
   "session_token": "st_…"
 }
 ```
@@ -51,7 +52,7 @@ curl https://voice-api.live.ermis.ai/v1/voice/v0.5.2/sessions \
 ```xml
 <Response>
   <Connect>
-    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.5.2/twilio">
+    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/twilio">
       <Parameter name="session_token" value="st_…" />
     </Stream>
   </Connect>
@@ -107,7 +108,7 @@ Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o to
 
 ## Sessões (REST)
 
-Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.5.2/sessions` é a 0.5.2 (`v1` é a versão da API HTTP; `v0.5.2`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
+Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.5.3/sessions` é a 0.5.3 (`v1` é a versão da API HTTP; `v0.5.3`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
 
 | Método e caminho | O que faz |
 |---|---|
@@ -146,8 +147,11 @@ Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do moto
 | `waiting` | objeto | [ver abaixo](#enquanto-a-sua-ia-pensa) | Mensagens de espera e tempo limite enquanto a sua IA prepara a resposta |
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
 | `dtmf` | booleano ou `null` | no Twilio, ligado | As teclas do cliente chegam à Ermis (evento `dtmf`; um `expect_slot` com `dtmf: true` aceita o dado digitado). No `websocket` e no navegador, `true` quando a sua telefonia manda as teclas (`{"type": "dtmf"}`) |
-| `echo` | objeto | ligado no motor 0.5.2 | A voz do próprio agente voltando pela linha (navegador sem cancelamento de eco, viva-voz) não o interrompe; o cliente falando por cima continua interrompendo. `{"enabled": false}` desliga. Sem custo de latência |
+| `echo` | objeto | ligado no motor 0.5.3 | A voz do próprio agente voltando pela linha (navegador sem cancelamento de eco, viva-voz) não o interrompe; o cliente falando por cima continua interrompendo. `{"enabled": false}` desliga. Sem custo de latência |
 | `monitoring` | booleano | `true` | Guarda a ligação quando ela termina: áudio em dois canais, conversa e métricas ([ver abaixo](#monitoramento-das-ligações)). `false`: nada desta ligação fica guardado |
+| `profile` | string | nenhum | Motor 0.5.3: `latency`, `balanced` ou `accuracy`, uma combinação medida de `end_of_turn`, `transcription_priority`, `precise_wait_ms` e `early_turn`. Os campos que você mandar ganham do perfil |
+| `hotwords_in_stt` | booleano | `false` | Motor 0.5.3: o `vocabulary` também orienta o reconhecimento rápido. **Adiciona ~0,29 s por turno** |
+| `guardrails` | objeto | desligado | Motor 0.5.3: checagens da fala do cliente e das falas do agente ([ver abaixo](#guardrails)) |
 
 Resposta `201`: `session_id`, `audio_url`, `control_url`, `session_token`.
 
@@ -504,6 +508,46 @@ Seu servidor conduz a conversa pelo `control_url`, como no Twilio.
 ### Seu próprio WebSocket (`transport: "websocket"`)
 
 Um único socket (`control_url`) leva áudio e controle. Você envia quadros binários de μ-law 8 kHz e recebe os quadros de áudio do agente. Como é você quem toca o áudio, avise quando cada fala terminou: `{"type": "playback_finished", "id": "r1"}`.
+
+## Guardrails
+
+Desligados por padrão; ligue com `guardrails` ao criar a sessão (motor 0.5.3, todas as versões aceitam). Precisam da
+camada 2 da Ermis; sem ela, chega `warning: guardrails_unavailable` e nada é checado.
+
+```json
+"guardrails": {
+  "business": "Pizzaria por telefone: pedidos, entrega e pagamento na entrega",
+  "caller": {"checks": ["injection", "abuse", "sensitive_data"], "rules": ["concorrentes ou outras pizzarias"]},
+  "agent": {"mode": "block", "rules": ["Nunca prometa desconto, brinde ou entrega grátis"], "threshold": 0.7},
+  "fallback": "Desculpe, nisso eu não consigo te ajudar. Posso ajudar com outra coisa?"
+}
+```
+
+| Lado | Checagens prontas | O que acontece | Custo |
+|---|---|---|---|
+| Cliente (`caller`) | `injection` (tenta manipular o assistente), `authority_claim` (alega cargo ou autorização para pedir exceção), `abuse` (ofensa ou ameaça), `sensitive_data` (cartão, CVV, senha, código) + as suas `rules` (assuntos) | A `decision` traz `guardrails`: `fired` (o que disparou) e `scores` | Nenhum: vai na mesma avaliação da decisão |
+| Agente (`agent`), `mode: "audit"` | `offensive`, `professional_advice` (médico, jurídico, financeiro), `third_party_data`, `instructions_leak` + as suas `rules` (regras que a fala não pode quebrar) | A fala toca; se algo disparar, chega o evento `guardrail` | Nenhum na fala |
+| Agente, `mode: "block"` | as mesmas | A fala é checada antes de tocar; reprovada, toca o `fallback` e chega `guardrail` com `blocked: true` | ~0,2 s a mais por fala checada |
+
+Um lado que você não cita fica desligado; citado sem `checks`, usa todas as checagens prontas dele. `threshold`
+(0,7) e `thresholds` por checagem ajustam a sensibilidade; até 20 `rules` por lado. Uma fala fixa do roteiro pode
+pular a checagem com `"check": false` no `speak` ou no `ask`. A checagem que falhar ou passar de 1,2 s não segura a
+ligação: a fala toca e o evento traz `error`.
+
+No SDK:
+
+```python
+session = await ermis.sessions.create(transport="twilio", guardrails={
+    "caller": {"checks": ["injection", "abuse"]},
+    "agent": {"mode": "block", "rules": ["Nunca prometa desconto"]},
+})
+...
+if isinstance(event, Decision) and "injection" in event.guardrails.get("fired", []):
+    await call.speak("Posso te ajudar com o seu pedido?")
+elif isinstance(event, Guardrail) and event.blocked:
+    log.warning("fala %s bloqueada: %s", event.id, event.rules)
+await call.speak("Hoje a borda é por nossa conta!", check=False)  # frase fixa do roteiro: sem checagem
+```
 
 ## Monitoramento das ligações
 

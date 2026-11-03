@@ -142,6 +142,7 @@ def session_body(
     monitoring: bool = UNSET,
     profile: Profile = UNSET,
     hotwords_in_stt: bool | None = UNSET,
+    guardrails: dict[str, Any] = UNSET,
 ) -> dict[str, Any]:
     """Monta o corpo JSON de criação de sessão, sem os campos não informados.
 
@@ -178,6 +179,7 @@ def session_body(
         "monitoring": monitoring,
         "profile": profile,
         "hotwords_in_stt": hotwords_in_stt,
+        "guardrails": guardrails,
     }
     body: dict[str, Any] = {}
     for key, value in raw.items():

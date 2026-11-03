@@ -678,7 +678,7 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
     assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
-    # The voice routes of this SDK's version: SDK 0.5.2 talks to Ermis Voice 0.5.2
+    # The voice routes of this SDK's version: SDK 0.5.3 talks to Ermis Voice 0.5.3
     from ermis.client import VOICE_PATH
 
     assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH
@@ -765,3 +765,43 @@ async def test_monitoring_of_a_running_call_is_an_api_error_409():
     with pytest.raises(APIError) as caught:
         await client.sessions.monitoring("vs_1")
     assert caught.value.status == 409
+
+
+async def test_guardrails_option_event_and_unchecked_lines():
+    from ermis import Guardrail, parse_event
+    from ermis.options import session_body
+
+    config = {"caller": {"checks": ["injection"]}, "agent": {"mode": "block", "rules": ["Nunca prometa desconto"]}}
+    assert session_body(guardrails=config, profile="balanced", hotwords_in_stt=False) == {
+        "guardrails": config,
+        "profile": "balanced",
+        "hotwords_in_stt": False,
+    }
+    ev = parse_event(
+        {
+            "type": "guardrail",
+            "side": "agent",
+            "id": "r1",
+            "blocked": True,
+            "fired": ["rule_1"],
+            "rules": {"rule_1": "Nunca prometa desconto"},
+            "scores": {"rule_1": 0.97},
+        }
+    )
+    assert isinstance(ev, Guardrail) and ev.blocked and ev.fired == ("rule_1",) and ev.rules["rule_1"]
+    decision = parse_event({"type": "decision", "intent": "complex", "guardrails": {"fired": ["injection"]}})
+    assert decision.guardrails["fired"] == ["injection"]
+    assert parse_event({"type": "decision", "intent": "greeting"}).guardrails == {}
+
+    sent = []
+
+    class Ws:
+        async def send(self, data):
+            sent.append(json.loads(data))
+
+    from ermis import Call
+
+    call = Call(Ws(), normalize_text=False)
+    await call.speak("Hoje tem desconto no cardápio.", check=False)
+    await call.speak("Oi")
+    assert sent[0]["check"] is False and "check" not in sent[1]
