@@ -16,6 +16,8 @@ Tudo roda na Ermis: detecção de fala, transcrição, decisões e voz. Você pa
 - [Enquanto a sua IA pensa](#enquanto-a-sua-ia-pensa)
 - [Conectando a sua IA](#conectando-a-sua-ia)
 - [Conectando o áudio](#conectando-o-áudio)
+- [Guardrails](#guardrails)
+- [Monitoramento das ligações](#monitoramento-das-ligações)
 - [Erros e limites](#erros-e-limites)
 - [Boas práticas](#boas-práticas)
 - [Perguntas frequentes: qualidade e latência](#perguntas-frequentes-qualidade-e-latência)
@@ -30,7 +32,7 @@ Um atendente por telefone com o Twilio, em quatro passos.
 **2. Quando a ligação chegar, crie uma sessão:**
 
 ```bash
-curl https://voice-api.live.ermis.ai/v1/voice/sessions \
+curl https://voice-api.live.ermis.ai/v1/voice/v0.5.3/sessions \
   -H "Authorization: Bearer $ERMIS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"transport": "twilio", "voice": "Sarah", "auto_decide": true}'
@@ -39,8 +41,8 @@ curl https://voice-api.live.ermis.ai/v1/voice/sessions \
 ```json
 {
   "session_id": "vs_8f2c1a",
-  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/twilio",
-  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/sessions/vs_8f2c1a/control",
+  "audio_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/twilio",
+  "control_url": "wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/sessions/vs_8f2c1a/control",
   "session_token": "st_…"
 }
 ```
@@ -50,7 +52,7 @@ curl https://voice-api.live.ermis.ai/v1/voice/sessions \
 ```xml
 <Response>
   <Connect>
-    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/twilio">
+    <Stream url="wss://voice-api.live.ermis.ai/v1/voice/v0.5.3/twilio">
       <Parameter name="session_token" value="st_…" />
     </Stream>
   </Connect>
@@ -106,7 +108,7 @@ Nunca coloque a chave de API no navegador ou no aplicativo do usuário. Use o to
 
 ## Sessões (REST)
 
-Base: `https://voice-api.live.ermis.ai`
+Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do motor depois de `/v1/voice`: `/v1/voice/v0.5.3/sessions` é a 0.5.3 (`v1` é a versão da API HTTP; `v0.5.3`, a do motor de voz), e o SDK de mesmo número usa a dele. Sem versão (`/v1/voice/sessions`), é a mais nova. `GET /health` lista as versões disponíveis (`versions`); uma versão que não existe responde `404 version_not_available`. Nas tabelas abaixo, `/v1/voice/...` vale também com a versão.
 
 | Método e caminho | O que faz |
 |---|---|
@@ -130,6 +132,8 @@ Base: `https://voice-api.live.ermis.ai`
 | `transcription_priority` | string | `balanced` | `balanced`, `latency` (transcrição mais rápida, menos precisa), `accuracy` (confere falas duvidosas), `local_first` (a leitura de maior qualidade só nas falas em que o reconhecimento rápido ficou em dúvida) ou `local_only` (só o reconhecimento rápido). Ver [perguntas frequentes](#perguntas-frequentes-qualidade-e-latência) |
 | `precise_wait_ms` | inteiro | `0` | Com `latency` e `local_first`: quanto uma resposta marcada como importante (`precise`, `slot`) espera a leitura de maior qualidade, em ms (0 a 3000). `0` (padrão): não espera; a leitura precisa chega depois, como revisão. As outras prioridades sempre esperam |
 | `turn_detection` | string | `smart_turn` | `smart_turn`: um modelo ouve como a fala termina e fecha o turno antes do silêncio completo quando a pessoa terminou; `silence`: só o silêncio de `vad.min_silence_ms` |
+| `end_of_turn` | string | `balanced` (`fast` até o motor 0.4.9) | Quanto o agente espera depois que o cliente para de falar. `fast`: 0,43 s em média, mas trata como fim 42% das pausas de quem ia continuar; `balanced`: **+0,16 s em todo turno** (23% das pausas); `patient`: **+0,37 s em todo turno** (9%). Os campos `vad` e `early_turn` que você mandar ganham do perfil |
+| `ask_again_on_ambiguous_stt` | booleano ou `null` | `true` | Quando o reconhecimento leu a fala de dois jeitos parecidos que mudam o sentido, a Ermis pergunta de novo (a `Decision` vem com `guidance` `misheard` e, em `raw`, `misheard_reason` `stt_ambiguous` e `heard_alternatives`); a segunda dúvida seguida segue para o seu código marcada (`uncertain`; com `guard.on_misheard_again` `"end"`, encerra como até o 0.4.9). **Adiciona latência**: +5 a +30 ms por turno e, nas falas com duas leituras, às vezes ~0,2 s; e perguntas a mais (8% das falas num teste offline). `false`: segue com a leitura mais provável; `null`: o padrão da versão |
 | `vad.min_silence_ms` | int | `400` | Silêncio que encerra a fala do cliente |
 | `early_turn.speculate` | bool | `false` | Começa a transcrever (e a decidir) já na pausa do cliente, antes de o turno fechar. Se o cliente voltar a falar, esse trabalho é descartado |
 | `early_turn.pause_ms` | int | `160` | Pausa que inicia esse trabalho adiantado (60 a 1000) |
@@ -142,6 +146,12 @@ Base: `https://voice-api.live.ermis.ai`
 | `custom_intents` | lista | `[]` | Intenções do seu negócio (`key`, `label`, `description`; até 20). Cada decisão automática já traz `custom_intent` com a escolhida, sem pedido extra ([ver abaixo](#intenções-customizadas)) |
 | `waiting` | objeto | [ver abaixo](#enquanto-a-sua-ia-pensa) | Mensagens de espera e tempo limite enquanto a sua IA prepara a resposta |
 | `metadata` | objeto | `{}` | Seus dados (id da ligação, do cliente…). Voltam nos eventos e no relatório de uso |
+| `dtmf` | booleano ou `null` | no Twilio, ligado | As teclas do cliente chegam à Ermis (evento `dtmf`; um `expect_slot` com `dtmf: true` aceita o dado digitado). No `websocket` e no navegador, `true` quando a sua telefonia manda as teclas (`{"type": "dtmf"}`) |
+| `echo` | objeto | ligado no motor 0.5.3 | A voz do próprio agente voltando pela linha (navegador sem cancelamento de eco, viva-voz) não o interrompe; o cliente falando por cima continua interrompendo. `{"enabled": false}` desliga. Sem custo de latência |
+| `monitoring` | booleano | `true` | Guarda a ligação quando ela termina: áudio em dois canais, conversa e métricas ([ver abaixo](#monitoramento-das-ligações)). `false`: nada desta ligação fica guardado |
+| `profile` | string | nenhum | Motor 0.5.3: `latency`, `balanced` ou `accuracy`, uma combinação medida de `end_of_turn`, `transcription_priority`, `precise_wait_ms` e `early_turn`. Os campos que você mandar ganham do perfil |
+| `hotwords_in_stt` | booleano | `false` | Motor 0.5.3: o `vocabulary` também orienta o reconhecimento rápido. **Adiciona ~0,29 s por turno** |
+| `guardrails` | objeto | desligado | Motor 0.5.3: checagens da fala do cliente e das falas do agente ([ver abaixo](#guardrails)) |
 
 Resposta `201`: `session_id`, `audio_url`, `control_url`, `session_token`.
 
@@ -498,6 +508,79 @@ Seu servidor conduz a conversa pelo `control_url`, como no Twilio.
 ### Seu próprio WebSocket (`transport: "websocket"`)
 
 Um único socket (`control_url`) leva áudio e controle. Você envia quadros binários de μ-law 8 kHz e recebe os quadros de áudio do agente. Como é você quem toca o áudio, avise quando cada fala terminou: `{"type": "playback_finished", "id": "r1"}`.
+
+## Guardrails
+
+Desligados por padrão; ligue com `guardrails` ao criar a sessão (motor 0.5.3, todas as versões aceitam). Precisam da
+camada 2 da Ermis; sem ela, chega `warning: guardrails_unavailable` e nada é checado.
+
+```json
+"guardrails": {
+  "business": "Pizzaria por telefone: pedidos, entrega e pagamento na entrega",
+  "caller": {"checks": ["injection", "abuse", "sensitive_data"], "rules": ["concorrentes ou outras pizzarias"]},
+  "agent": {"mode": "block", "rules": ["Nunca prometa desconto, brinde ou entrega grátis"], "threshold": 0.7},
+  "fallback": "Desculpe, nisso eu não consigo te ajudar. Posso ajudar com outra coisa?"
+}
+```
+
+| Lado | Checagens prontas | O que acontece | Custo |
+|---|---|---|---|
+| Cliente (`caller`) | `injection` (tenta manipular o assistente), `authority_claim` (alega cargo ou autorização para pedir exceção), `abuse` (ofensa ou ameaça), `sensitive_data` (cartão, CVV, senha, código) + as suas `rules` (assuntos) | A `decision` traz `guardrails`: `fired` (o que disparou) e `scores` | Nenhum: vai na mesma avaliação da decisão |
+| Agente (`agent`), `mode: "audit"` | `offensive`, `professional_advice` (médico, jurídico, financeiro), `third_party_data`, `instructions_leak` + as suas `rules` (regras que a fala não pode quebrar) | A fala toca; se algo disparar, chega o evento `guardrail` | Nenhum na fala |
+| Agente, `mode: "block"` | as mesmas | A fala é checada antes de tocar; reprovada, toca o `fallback` e chega `guardrail` com `blocked: true` | ~0,2 s a mais por fala checada |
+
+Um lado que você não cita fica desligado; citado sem `checks`, usa todas as checagens prontas dele. `threshold`
+(0,7) e `thresholds` por checagem ajustam a sensibilidade; até 20 `rules` por lado. Uma fala fixa do roteiro pode
+pular a checagem com `"check": false` no `speak` ou no `ask`. A checagem que falhar ou passar de 1,2 s não segura a
+ligação: a fala toca e o evento traz `error`.
+
+No SDK:
+
+```python
+session = await ermis.sessions.create(transport="twilio", guardrails={
+    "caller": {"checks": ["injection", "abuse"]},
+    "agent": {"mode": "block", "rules": ["Nunca prometa desconto"]},
+})
+...
+if isinstance(event, Decision) and "injection" in event.guardrails.get("fired", []):
+    await call.speak("Posso te ajudar com o seu pedido?")
+elif isinstance(event, Guardrail) and event.blocked:
+    log.warning("fala %s bloqueada: %s", event.id, event.rules)
+await call.speak("Hoje a borda é por nossa conta!", check=False)  # frase fixa do roteiro: sem checagem
+```
+
+## Monitoramento das ligações
+
+Ligado por padrão (`monitoring`, em todas as versões do motor). Quando a ligação termina, a Ermis guarda o áudio em
+dois canais (8 kHz; à esquerda o cliente, à direita o agente, cada fala onde tocou e cortada onde foi interrompida), a
+conversa (cada fala com o tempo desde o início, o texto revisado, a decisão e as dúvidas) e as métricas: duração,
+créditos e motivo do fim; tempo de fala de cada lado; turnos; latência de cada etapa (média, p50, p90, máximo);
+entendimento; dados ditados; interrupções; mensagens de espera; qualidade da linha; teclas; erros.
+
+Na plataforma da Ermis, a página **Ligações** mostra as ligações da conta, com o áudio, a conversa e as métricas, e
+apaga a que você quiser (de vez). Pela API, com a chave que criou a sessão, depois que ela terminou:
+
+| Método e caminho | O que devolve |
+|---|---|
+| `GET /v1/voice/sessions/{session_id}/monitoring` | `metrics` e `conversation` |
+| `GET /v1/voice/sessions/{session_id}/monitoring/audio.wav` | O áudio em dois canais |
+| `GET /v1/voice/sessions/{session_id}/monitoring/conversation.txt` | A conversa em texto |
+
+Outra chave, ou uma sessão sem monitoramento: `404`; sessão em andamento: `409`.
+
+No SDK:
+
+```python
+dados = await ermis.sessions.monitoring(session_id)
+print(dados["metrics"]["latency_ms"]["total_ms"])  # {"count", "mean", "p50", "p90", "max"}
+for fala in dados["conversation"]:
+    print(f'{fala["t"]:6.1f}s {fala["speaker"]}: {fala["text"]}')
+wav = await ermis.sessions.monitoring_audio(session_id)
+texto = await ermis.sessions.monitoring_transcript(session_id)
+```
+
+O áudio e a conversa são dados pessoais do seu cliente: use `monitoring=False` nas ligações que não podem ser
+guardadas.
 
 ## Erros e limites
 

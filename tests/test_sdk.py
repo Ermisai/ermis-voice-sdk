@@ -15,7 +15,9 @@ import httpx
 import pytest
 from websockets.asyncio.server import serve
 
+import ermis
 from ermis import (
+    API_VERSION,
     AuthenticationError,
     BargeIn,
     ChannelLimitError,
@@ -68,7 +70,7 @@ async def test_create_session_sends_only_given_fields():
 
     assert session.session_id == "vs_1"
     assert seen[0].headers["authorization"] == "Bearer ek_test_123"
-    assert seen[0].url.path == "/v1/voice/sessions"
+    assert seen[0].url.path == f"/v1/voice/v{API_VERSION}/sessions"  # the route of the SDK's version
     assert json.loads(seen[0].content) == {
         "transport": "twilio",
         "voice": "woman",
@@ -152,7 +154,7 @@ async def test_list_voices_and_use_one():
     sent = []
 
     def api(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/voice/voices":
+        if request.url.path == f"/v1/voice/v{API_VERSION}/voices":
             return httpx.Response(
                 200,
                 json={
@@ -356,6 +358,10 @@ def test_transcription_priority_option():
     assert session_body(transcription_priority="latency") == {"transcription_priority": "latency"}
     assert "transcription_priority" not in session_body()
     assert session_body(precise_wait_ms=0) == {"precise_wait_ms": 0}  # 0 is sent: never wait
+    assert session_body(end_of_turn="patient", ask_again_on_ambiguous_stt=False) == {
+        "end_of_turn": "patient",
+        "ask_again_on_ambiguous_stt": False,
+    }  # False is sent: turns the 0.4.9 default off
 
 
 def test_waiting_options_new_fields():
@@ -672,6 +678,10 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
 
     monkeypatch.delenv("ERMIS_API_URL", raising=False)
     assert Ermis("ek_test_x").base_url == DEFAULT_BASE_URL == "https://voice-api.live.ermis.ai"
+    # The voice routes of this SDK's version: SDK 0.5.3 talks to Ermis Voice 0.5.3
+    from ermis.client import VOICE_PATH
+
+    assert f"/v1/voice/v{API_VERSION}" == VOICE_PATH
 
     def recusa(request):
         raise httpx.ConnectError("nodename nor servname provided", request=request)
@@ -680,3 +690,118 @@ async def test_default_url_and_connection_error_says_where_it_tried(monkeypatch)
     ermis._http = httpx.AsyncClient(base_url=ermis.base_url, transport=httpx.MockTransport(recusa))
     with pytest.raises(APIError, match="nao-existe.exemplo.*ERMIS_API_URL"):
         await ermis.balance()
+
+
+def test_sdk_and_api_versions_move_together():
+    """The SDK's X.Y.Z is the API version it talks to; pyproject.toml declares the same release."""
+    import re
+    from pathlib import Path
+
+    pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
+    assert re.search(r'^version = "([^"]+)"', pyproject, re.M)[1] == ermis.__version__
+    assert re.fullmatch(r"\d+\.\d+\.\d+", ermis.API_VERSION) and ermis.__version__.startswith(ermis.API_VERSION)
+
+
+async def test_every_request_says_the_sdk_version():
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("user-agent"))
+        return httpx.Response(200, json={"available_credits": 10})
+
+    client = _client(handler)
+    await client.balance()
+    assert seen == [f"ermis-voice-python/{ermis.__version__}"]
+
+
+def test_slot_failed_with_reason_heard_and_attempts():
+    from ermis import SLOT_FAILURE_REASONS, SlotResult, parse_event
+
+    ev = parse_event(
+        {
+            "type": "slot",
+            "id": "q1",
+            "value": "39053344706",
+            "status": "failed",
+            "reason": "invalid",
+            "value_status": "invalid",
+            "heard": ["três nove zero", "três nove zero"],
+            "attempts": 2,
+        }
+    )
+    assert isinstance(ev, SlotResult) and ev.failed and not ev.found
+    assert ev.reason == "invalid" in SLOT_FAILURE_REASONS and ev.heard == ("três nove zero", "três nove zero")
+    assert ev.attempts == 2 and ev.raw["value_status"] == "invalid"
+    ok = parse_event({"type": "slot", "id": "q2", "value": "x", "status": "found"})
+    assert ok.found and not ok.failed and ok.reason is None and ok.heard == () and ok.attempts == 0
+
+
+async def test_monitoring_option_and_reading_a_call_back():
+    from ermis.options import session_body
+
+    assert session_body(monitoring=False, echo={"enabled": False}) == {"monitoring": False, "echo": {"enabled": False}}
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        if request.url.path.endswith("/monitoring"):
+            return httpx.Response(200, json={"metrics": {"turns": {"caller": 1}}, "conversation": []})
+        if request.url.path.endswith("audio.wav"):
+            return httpx.Response(200, content=b"RIFF....WAVE", headers={"content-type": "audio/wav"})
+        return httpx.Response(200, content=b"[00:01.00] Cliente: oi\n", headers={"content-type": "text/plain"})
+
+    client = _client(handler)
+    assert (await client.sessions.monitoring("vs_1"))["metrics"]["turns"]["caller"] == 1
+    assert await client.sessions.monitoring_audio("vs_1") == b"RIFF....WAVE"
+    assert await client.sessions.monitoring_transcript("vs_1") == "[00:01.00] Cliente: oi\n"
+    base = f"/v1/voice/v{API_VERSION}/sessions/vs_1/monitoring"
+    assert seen == [base, base + "/audio.wav", base + "/conversation.txt"]
+
+
+async def test_monitoring_of_a_running_call_is_an_api_error_409():
+    from ermis import APIError
+
+    client = _client(lambda request: httpx.Response(409, json={"error": "conflict", "message": "not ended"}))
+    with pytest.raises(APIError) as caught:
+        await client.sessions.monitoring("vs_1")
+    assert caught.value.status == 409
+
+
+async def test_guardrails_option_event_and_unchecked_lines():
+    from ermis import Guardrail, parse_event
+    from ermis.options import session_body
+
+    config = {"caller": {"checks": ["injection"]}, "agent": {"mode": "block", "rules": ["Nunca prometa desconto"]}}
+    assert session_body(guardrails=config, profile="balanced", hotwords_in_stt=False) == {
+        "guardrails": config,
+        "profile": "balanced",
+        "hotwords_in_stt": False,
+    }
+    ev = parse_event(
+        {
+            "type": "guardrail",
+            "side": "agent",
+            "id": "r1",
+            "blocked": True,
+            "fired": ["rule_1"],
+            "rules": {"rule_1": "Nunca prometa desconto"},
+            "scores": {"rule_1": 0.97},
+        }
+    )
+    assert isinstance(ev, Guardrail) and ev.blocked and ev.fired == ("rule_1",) and ev.rules["rule_1"]
+    decision = parse_event({"type": "decision", "intent": "complex", "guardrails": {"fired": ["injection"]}})
+    assert decision.guardrails["fired"] == ["injection"]
+    assert parse_event({"type": "decision", "intent": "greeting"}).guardrails == {}
+
+    sent = []
+
+    class Ws:
+        async def send(self, data):
+            sent.append(json.loads(data))
+
+    from ermis import Call
+
+    call = Call(Ws(), normalize_text=False)
+    await call.speak("Hoje tem desconto no cardápio.", check=False)
+    await call.speak("Oi")
+    assert sent[0]["check"] is False and "check" not in sent[1]

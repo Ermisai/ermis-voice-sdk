@@ -101,13 +101,25 @@ class Decision(Event):
     answer: str | None = None
     """``"yes"``, ``"no"`` ou ``None``: o sim/não da fala como resposta à última pergunta do agente."""
     guidance: str | None = None
-    """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"`` ou ``None``."""
+    """Decidido pela Ermis: ``"unclear"`` (fala confusa), ``"drifting"`` (divagação), ``"off_topic"``, ``"misheard"``
+    (a transcrição provavelmente não é o que o cliente disse) ou ``None``.
+
+    Motor 0.5.0: ``raw["uncertain"]`` e ``raw["uncertain_reasons"]`` dizem quando o texto da fala pode estar errado
+    (``"misheard_again"``, ``"stt_ambiguous"``, ``"stt_rival"``, ``"readings_differ"``, ``"low_heard"``): leia de
+    volta um dado que veio dessa fala antes de usar."""
     handled: bool = False
     """Com o ``guard`` da sessão: a Ermis já respondeu esta fala (``guided_text``). Não responda."""
     guided_text: str | None = None
     choice: str | None = None
     """Com ``ask(..., choices=...)``: a resposta esperada que o cliente quis dizer, ou ``"none"``."""
     choice_confidence: float | None = None
+
+    @property
+    def guardrails(self) -> dict[str, Any]:
+        """Os guardrails da fala do cliente (``guardrails={"caller": ...}``, motor 0.5.3): ``fired`` (as checagens que
+        dispararam: ``injection``, ``authority_claim``, ``abuse``, ``sensitive_data``, ``rule_1``…) e ``scores``.
+        Vazio quando a sessão não os pediu."""
+        return self.raw.get("guardrails") or {}
 
     def chosen(self, min_confidence: float = 0.8) -> str | None:
         """A resposta esperada escolhida, quando a escolha é segura; ``None`` quando não é."""
@@ -207,20 +219,87 @@ class Decision(Event):
         )
 
 
+# Motor 0.5.1: por que um slot de expect_slot falhou (SlotResult.reason com status "failed")
+SLOT_FAILURE_REASONS = (
+    "invalid",
+    "incomplete",
+    "timeout",
+    "not_found",
+    "off_topic",
+    "escape",
+    "denied",
+    "unconfirmed",
+    "no_answer",
+    "keypad_timeout",
+    "dtmf_unavailable",
+)
+
+
 @dataclass(frozen=True)
 class SlotResult(Event):
-    """Resposta de ``call.extract_slot()``."""
+    """Resposta de ``call.extract_slot()`` (e o valor de ``expect_slot`` / ``ask(..., slot=...)``).
+
+    Motor 0.5.0, no valor de ``expect_slot``: ``raw["uncertain"]`` (o valor pode estar errado: leia de volta para o
+    cliente confirmar antes de usar), ``raw["uncertain_reasons"]`` (os da ``Decision`` da fala, mais
+    ``"readings_differ"``: o outro reconhecimento dá outro valor; ``"stt_rival"``: a leitura rival dá outro valor;
+    ``"low_confidence"``) e ``raw["alternatives"]`` (``[{"value", "text", "source"}]``, os outros valores lidos). O
+    ``value`` é sempre o ouvido pela leitura de maior qualidade: a Ermis não troca o valor. Sem custo de latência.
+
+    Motor 0.5.1 (``engine_version="0.5.1"``), no ``expect_slot``: a Ermis colhe o dado até ele estar pronto (espera o
+    resto, pede de novo o que não valida, lê de volta o que tem dúvida) e manda **um** ``SlotResult``; as ``Decision``
+    no caminho vêm com ``handled`` e ``raw["slot_pending"]`` (espere este resultado em vez de responder a elas).
+    Campos em ``raw``: ``readback`` (o valor em blocos, pronto para falar: "três nove zero, cinco três três, ..."),
+    ``candidates`` (``[{"value", "readback", "source"}]``, os valores que validam), ``confirmed`` (o cliente confirmou
+    a leitura de volta), ``source`` (``precise``, ``fast``, ``fast_nbest``, ``dtmf``, ``partial``), ``parts``
+    (endereço: ``street``, ``number``, ``neighbourhood``), ``joined`` (juntou falas), ``timeout`` (o resto não veio),
+    ``valid`` (``False`` com ``validate=False``). Novos motivos em ``uncertain_reasons``: ``"corrected"`` (a correção
+    que o cliente fez no meio), ``"nbest"`` (uma alternativa do reconhecimento), ``"misheard"``.
+    """
 
     id: str
     value: Any
     status: str
-    """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido)."""
+    """``found``, ``not_found`` ou ``rejected`` (a fala não responde ao que foi pedido). Motor 0.5.1, nos dados com
+    formato (cpf, cnpj, phone, cep, email, date), no ``extract_slot``: ``found`` só quando o valor valida;
+    ``incomplete`` (faltou um pedaço), ``invalid`` (completo, mas não valida) ou ``ambiguous`` (duas leituras validam:
+    ``candidates``).
+
+    Motor 0.5.1, no ``expect_slot``/``ask(..., slot=...)``: ``found``, ``ambiguous`` (só com ``confirm=False``) ou
+    ``failed``: o dado não saiu, e ``reason`` diz por quê. A Ermis nunca encerra nem transfere por isso: o que fazer
+    (oferecer o teclado, passar para um atendente, seguir sem o dado) é regra do seu negócio."""
     revised: bool = False
     """Com prioridade de latência: o valor relido pelo reconhecimento de maior precisão, diferente do primeiro."""
+    reason: str | None = None
+    """Motor 0.5.1, com ``status == "failed"``: por que o dado não saiu (``SLOT_FAILURE_REASONS``):
+
+    - ``invalid``: o que veio não valida (CPF com dígito errado, telefone sem DDD válido), mesmo depois de a Ermis
+      pedir de novo; também as teclas terminadas com ``#`` que não formam o dado;
+    - ``incomplete``: faltou um pedaço e o turno acabou;
+    - ``timeout``: veio parte do dado e o resto não veio (a Ermis já pediu o resto uma vez);
+    - ``not_found``: a resposta não tinha esse dado ("não lembro agora");
+    - ``off_topic``: a resposta era sobre outra coisa;
+    - ``escape``: o cliente pediu um atendente no meio;
+    - ``denied``: a Ermis leu de volta e o cliente disse que não (depois de pedir de novo uma vez);
+    - ``unconfirmed``: a Ermis leu de volta e o cliente não disse nem sim nem não, duas vezes (``value`` é o ouvido,
+      sem confirmação);
+    - ``no_answer``: o cliente não respondeu (o último ``no_reply`` do guard);
+    - ``keypad_timeout``: o cliente começou a digitar e parou (5 s sem tecla) sem completar o dado;
+    - ``dtmf_unavailable``: o slot pediu o teclado (``dtmf=True``) numa sessão que não recebe teclas (fora do Twilio,
+      diga ``dtmf=True`` ao criar a sessão); vem na hora, e a resposta por voz chega como uma ``Decision`` comum."""
+    heard: tuple[str, ...] = ()
+    """Motor 0.5.1: o que o cliente disse para esse dado, resposta por resposta (o texto ouvido; as teclas, no
+    teclado). Bom para o log e para passar ao atendente."""
+    attempts: int = 0
+    """Motor 0.5.1: quantas respostas o dado levou (``len(heard)``)."""
 
     @property
     def found(self) -> bool:
         return self.status == "found"
+
+    @property
+    def failed(self) -> bool:
+        """Motor 0.5.1: o dado não saiu (``reason`` diz por quê)."""
+        return self.status == "failed"
 
 
 @dataclass(frozen=True)
@@ -347,6 +426,31 @@ class NoReply(Event):
 
 
 @dataclass(frozen=True)
+class Guardrail(Event):
+    """Um guardrail da fala do agente disparou (``guardrails={"agent": ...}``, motor 0.5.3).
+
+    ``blocked``: no modo ``block``, a fala ``id`` não tocou e o agente disse a frase ``fallback`` da sessão; no modo
+    ``audit``, a fala tocou e isto é só o aviso. ``fired``: as checagens que dispararam (``offensive``,
+    ``professional_advice``, ``third_party_data``, ``instructions_leak``, ``rule_1``…); ``rules``: o texto das
+    regras do seu negócio que dispararam; ``scores``: a probabilidade de cada checagem. ``error``: a checagem
+    falhou ou demorou mais de 1,2 s, e a fala tocou."""
+
+    id: str | None
+    blocked: bool
+    fired: tuple[str, ...]
+    rules: dict[str, str]
+    scores: dict[str, float]
+    error: str | None = None
+
+
+class Dtmf(Event):
+    """O cliente digitou uma tecla no telefone (0–9, ``*``, ``#``). Num ``expect_slot(..., dtmf=True)`` as teclas
+    também preenchem o dado (o ``SlotResult`` vem com ``raw["source"] == "dtmf"``)."""
+
+    digit: str
+
+
+@dataclass(frozen=True)
 class UnknownEvent(Event):
     """Evento que esta versão do SDK ainda não conhece. Veja ``raw``."""
 
@@ -391,6 +495,17 @@ def parse_event(msg: dict[str, Any]) -> Event:
             corrections=list(g("corrections") or []),
             handled=bool(g("handled")),
         )
+    if t == "guardrail":
+        return Guardrail(
+            t,
+            msg,
+            id=g("id"),
+            blocked=bool(g("blocked")),
+            fired=tuple(g("fired") or ()),
+            rules=dict(g("rules") or {}),
+            scores=dict(g("scores") or {}),
+            error=g("error"),
+        )
     if t == "decision":
         return Decision(
             t,
@@ -413,8 +528,18 @@ def parse_event(msg: dict[str, Any]) -> Event:
         )
     if t == "slot":
         return SlotResult(
-            t, msg, id=g("id", ""), value=g("value"), status=g("status", "not_found"), revised=bool(g("revised"))
+            t,
+            msg,
+            id=g("id", ""),
+            value=g("value"),
+            status=g("status", "not_found"),
+            revised=bool(g("revised")),
+            reason=g("reason"),
+            heard=tuple(g("heard") or ()),
+            attempts=int(g("attempts") or 0),
         )
+    if t == "dtmf":
+        return Dtmf(t, msg, digit=str(g("digit") or ""))
     if t == "no_reply":
         return NoReply(t, msg, count=int(g("count") or 0), handled=bool(g("handled")), guided_text=g("guided_text"))
     if t == "transcript.revised":

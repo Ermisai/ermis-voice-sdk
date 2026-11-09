@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.5.3
+
+Requer a Ermis Voice API 0.5.3 (publique o SDK só depois dela). O SDK 0.5.3 fala com `/v1/voice/v0.5.3/...`.
+
+- **Guardrails** (`sessions.create(guardrails=...)`): checagens da fala do cliente, que chegam em
+  `Decision.guardrails` sem latência a mais, e das falas do agente, em `audit` (o evento `Guardrail` avisa) ou `block`
+  (a fala reprovada vira a frase `fallback`; ~0,2 s a mais por fala checada). `call.speak(..., check=False)` pula a
+  checagem de uma fala fixa do roteiro.
+- `sessions.create(profile=...)`: `"latency"`, `"balanced"` ou `"accuracy"` (tipo `ermis.options.Profile`).
+- `sessions.create(hotwords_in_stt=...)`: o vocabulário também orienta o reconhecimento rápido (~0,29 s por turno).
+- No motor 0.5.3 a transcrição e a decisão começam na pausa do cliente (`early_turn.speculate` ligado por padrão).
+
+## 0.5.2
+
+Requer a Ermis Voice API 0.5.2 (publique o SDK só depois dela). O SDK 0.5.2 fala com `/v1/voice/v0.5.2/...`.
+
+- **Monitoramento das ligações** (`sessions.create(monitoring=...)`, padrão `True`): ao fim da ligação a Ermis guarda
+  o áudio em dois canais, a conversa e as métricas. `ermis.sessions.monitoring(session_id)` (`metrics` e
+  `conversation`), `monitoring_audio()` (WAV) e `monitoring_transcript()` (texto); na plataforma, a página Ligações.
+  `False`: nada fica guardado.
+- `sessions.create(echo=...)` (motor 0.5.2): o eco do próprio agente na linha não o interrompe (ligado por padrão
+  na 0.5.2; `{"enabled": False}` desliga).
+- Motor 0.5.1, ditado: `expect_slot` com `patience`, `validate`, `on_invalid`, `confirm`, `confirm_listen`,
+  `backchannel`, `dtmf` e `fresh`; `SlotResult` com `status` `failed`, `reason` (`SLOT_FAILURE_REASONS`), `heard`,
+  `attempts`, `readback`, `candidates` e `confirmed`; o evento `Dtmf` e `call.dtmf()`; `sessions.create(dtmf=...)`.
+- Motor 0.5.0: `end_of_turn` `"balanced"` por padrão; `guard.on_misheard_again` (a segunda dúvida segue marcada);
+  `uncertain` e `uncertain_reasons` nas decisões e nos dados.
+- Pula da 0.4.9 para a 0.5.2 para alinhar com o motor (0.5.0 e 0.5.1 foram versões só do motor).
+
+## 0.4.9
+
+Requer a Ermis Voice API 0.4.9 (publique o SDK só depois dela). O SDK 0.4.9 fala com `/v1/voice/v0.4.9/...`.
+
+- `sessions.create(end_of_turn=...)`: quanto o agente espera numa pausa antes de responder. `"fast"` (padrão),
+  `"balanced"` (cerca de 0,16 s a mais por turno) ou `"patient"` (cerca de 0,37 s a mais), que cortam menos quem faz
+  pausas no meio da frase.
+- `sessions.create(ask_again_on_ambiguous_stt=...)`: no motor 0.4.9, quando a fala pode ter sido ouvida de duas
+  formas com sentidos diferentes, a Ermis pergunta de novo em vez de seguir com uma delas (ligado por padrão;
+  `False` desliga; `None` usa o padrão da versão). Adiciona +5 a +30 ms por turno e algumas perguntas a mais.
+- Tipo `ermis.options.EndOfTurn` e documentação de quanto cada opção atrasa a resposta.
+
+## 0.4.8
+
+**O SDK e a Ermis Voice API passam a ter sempre o mesmo número:** o SDK 0.4.8 fala com a API 0.4.8. Requer a Ermis
+Voice API 0.4.8 (publique o SDK só depois dela).
+
+- As rotas de voz levam a versão do SDK: `/v1/voice/v0.4.8/sessions`, `/v1/voice/v0.4.8/voices` (`v1` é a versão
+  da API HTTP; `v0.4.8`, a do motor de voz). Vale também com `ERMIS_API_URL` ou `base_url`, que continuam sendo só o
+  endereço (`https://voice-api.live.ermis.ai`). Na API, `/v1/voice/...` sem versão é a mais nova.
+- Cada chamada diz a versão do SDK (`User-Agent: ermis-voice-python/0.4.8`): numa rota de outra versão, a API
+  responde `sdk_version_mismatch`, dizendo qual SDK instalar.
+- `ermis.API_VERSION`: a versão da API com que este SDK fala. Uma correção só do SDK sai como `0.4.8.post1` e continua
+  falando com a 0.4.8.
+- Fala com o motor 0.4.8: o fim do turno ajustado em fala real, e a fala que chega enquanto a resposta é preparada
+  continua o turno do cliente. Em linhas ruidosas, o motor percebe a linha na saudação: a fala começa a ser ouvida mais
+  cedo, estalos não interrompem o agente, e falar por cima da saudação precisa passar do ruído ouvido até ali.
+- Pula da 0.4.1a1 para a 0.4.8 para alinhar com o motor (0.4.2 a 0.4.7 foram versões só do motor).
+
 ## 0.4.1a1 (prévia)
 
 Requer a Ermis Voice API 0.4.0.

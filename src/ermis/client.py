@@ -11,11 +11,24 @@ import httpx
 from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import InvalidStatus
 
+from ._version import API_VERSION, USER_AGENT
 from .call import Call
 from .errors import APIError, AuthenticationError, InvalidRequestError, from_http
-from .options import UNSET, AudioFormat, BargeInOptions, Transport, VadOptions, WaitingOptions, session_body
+from .options import (
+    UNSET,
+    AudioFormat,
+    BargeInOptions,
+    EndOfTurn,
+    Profile,
+    Transport,
+    VadOptions,
+    WaitingOptions,
+    session_body,
+)
 
 DEFAULT_BASE_URL = "https://voice-api.live.ermis.ai"
+# As rotas de voz da versão deste SDK (v1: a API HTTP; v0.5.3: o motor de voz): o SDK 0.5.3 fala com a Ermis Voice 0.5.3
+VOICE_PATH = f"/v1/voice/v{API_VERSION}"
 
 
 @dataclass(frozen=True)
@@ -78,7 +91,7 @@ class _Voices:
 
     async def list(self) -> list[Voice]:
         """Vozes disponíveis para a sua conta (``GET /v1/voice/voices``), a padrão primeiro."""
-        data = await self._client._request("GET", "/v1/voice/voices")
+        data = await self._client._request("GET", f"{VOICE_PATH}/voices")
         return [Voice.from_dict(item) for item in data.get("voices", [])]
 
 
@@ -98,6 +111,8 @@ class _Sessions:
         transcription_priority: str = UNSET,
         precise_wait_ms: int = UNSET,
         turn_detection: str = UNSET,
+        end_of_turn: EndOfTurn = UNSET,
+        ask_again_on_ambiguous_stt: bool | None = UNSET,
         early_turn: dict[str, Any] = UNSET,
         custom_intents: list[Any] = UNSET,
         vocabulary: list[str] = UNSET,
@@ -107,6 +122,12 @@ class _Sessions:
         waiting: WaitingOptions | dict[str, Any] = UNSET,
         max_duration_s: int = UNSET,
         metadata: dict[str, Any] = UNSET,
+        dtmf: bool | None = UNSET,
+        echo: dict[str, Any] = UNSET,
+        monitoring: bool = UNSET,
+        profile: Profile = UNSET,
+        hotwords_in_stt: bool | None = UNSET,
+        guardrails: dict[str, Any] = UNSET,
     ) -> Session:
         """Cria uma sessão (``POST /v1/voice/sessions``). Campos omitidos usam o padrão da API.
 
@@ -127,7 +148,76 @@ class _Sessions:
         frases do seu negócio, e repete a pergunta atual (a do último ``call.ask``). Ex.:
         ``{"enabled": True, "repeat": "...", "steer": "...", "drift": "...", "off_topic": "...", "give_up": "..."}``.
         ``off_topic`` vazio: as perguntas fora do tema chegam ao seu código (por exemplo, para a sua IA).
-        As decisões que a Ermis já respondeu chegam com ``handled``.
+        As decisões que a Ermis já respondeu chegam com ``handled``. Transcrição em dúvida (``guidance``
+        ``"misheard"``): a Ermis repete a pergunta uma vez; se a resposta vier de novo em dúvida, no motor 0.5.0 ela
+        segue para o seu código marcada (``handled`` falso, ``raw["uncertain"]`` e ``raw["uncertain_reasons"]`` com
+        ``"misheard_again"``), para você confirmar o dado ou transferir; ``"on_misheard_again": "end"`` no ``guard``
+        encerra a ligação (``give_up``), como até o 0.4.9. Sem custo de latência.
+
+        Latência × acurácia: as opções abaixo trocam tempo de resposta por acurácia. Cada uma diz quanto atrasa e
+        qual é o padrão (o do motor 0.5.0, a versão de produção).
+
+        ``end_of_turn`` (``"fast"``, ``"balanced"`` ou ``"patient"``; ver :data:`ermis.options.EndOfTurn`): quanto a
+        Ermis espera depois que o cliente para de falar. ``"fast"`` responde em 0,43 s, mas trata como fim 42% das
+        pausas de quem ia continuar; ``"balanced"`` (padrão no 0.5.0) **adiciona 0,16 s a todo turno** (23% das
+        pausas); ``"patient"`` **adiciona 0,37 s a todo turno** (9%). Até o 0.4.9 o padrão era ``"fast"``.
+
+        ``ask_again_on_ambiguous_stt``: quando o reconhecimento leu a fala de dois jeitos parecidos que mudam o
+        sentido ("quero calabresa" / "quero cala a breve"), a Ermis pergunta de novo em vez de seguir (a
+        ``Decision`` vem com ``guidance`` ``"misheard"`` e, em ``raw``, ``misheard_reason`` ``"stt_ambiguous"`` e
+        ``heard_alternatives``); a segunda dúvida seguida segue marcada no 0.5.0 (ver ``guard`` acima). Ela nunca
+        age sobre a outra leitura. **Adiciona latência**: +5 a +30 ms por turno (as N melhores leituras do
+        reconhecimento) e, nas falas com duas leituras, uma decisão a mais em paralelo (às vezes ~0,2 s de espera);
+        e **perguntas a mais** (8% das falas num teste offline; 2% dos turnos numa rodada de ligações de teste). ``None``: o padrão da versão do motor
+        (ligado no 0.4.9 e no 0.5.0). Desligada, a marca ``uncertain`` não tem os motivos ``stt_rival`` e
+        ``stt_ambiguous``.
+        **Recomendado desligar para público idoso ou que hesita muito**: na validação do 0.5.0, sem ela o
+        objetivo cumprido subiu 10 pontos e o fim certo 18 nesse público (repetir a pergunta atrapalha quem já
+        fala devagar); nesse caso use também ``end_of_turn="patient"``.
+
+        ``dtmf`` (motor 0.5.1): as teclas do cliente chegam à Ermis. No Twilio, sempre (padrão); no ``websocket`` e
+        no navegador, diga ``True`` quando a sua telefonia manda as teclas (``call.dtmf()``), ou elas valem a partir
+        da primeira tecla. Um ``expect_slot`` com ``dtmf=True`` numa sessão sem teclado falha na hora
+        (``SlotResult.reason == "dtmf_unavailable"``).
+
+        ``echo`` (motor 0.5.2, ligado por padrão nele): a voz do próprio agente voltando pela linha (navegador sem
+        cancelamento de eco, viva-voz) não interrompe o agente; o cliente falando por cima continua interrompendo.
+        ``{"enabled": False}`` desliga. Sem custo de latência.
+
+        ``monitoring`` (todas as versões, padrão ``True``): quando a ligação termina, a Ermis guarda o áudio em dois
+        canais (cliente e agente), a conversa, os eventos e as métricas (latência de cada etapa, entendimento, dados
+        ditados, interrupções, qualidade da linha). Leia com :meth:`monitoring`, :meth:`monitoring_audio` e
+        :meth:`monitoring_transcript`, ou na página Ligações da plataforma. ``False``: nada desta ligação fica
+        guardado (use nas ligações que não podem ser gravadas). Sem custo de latência.
+
+        ``profile`` (motor 0.5.3; ``"latency"``, ``"balanced"`` ou ``"accuracy"``; ver :data:`ermis.options.Profile`):
+        escolhe de uma vez ``end_of_turn``, ``transcription_priority``, ``precise_wait_ms`` e ``early_turn``. Os
+        campos que você mandar ganham dele.
+
+        ``early_turn``: no motor 0.5.3 o padrão é ``{"speculate": True}``: a transcrição e a decisão começam na pausa
+        do cliente e são descartadas se ele voltar a falar. **Sem custo de latência** (ela cai: −0,26 s por turno na
+        bateria, −0,37 a −0,42 s na CPU da produção) **nem de acurácia** (a fala que continua nunca usa esse trabalho,
+        e o turno espera quando o texto da pausa termina aberto); o custo é processamento (as transcrições e decisões
+        das pausas em que o cliente continua: ~2 transcrições e ~1 decisão por minuto de ligação).
+        ``{"speculate": False}`` desliga. ``close_on_complete_text`` continua desligado por padrão (nenhum ganho de
+        latência medido sobre a especulação, e mais cortes em fala humana).
+
+        ``hotwords_in_stt`` (motor 0.5.3; padrão desligado): o ``vocabulary`` também orienta o reconhecimento
+        rápido, que prefere a leitura com o termo quando o áudio a sustenta (nunca escreve um termo que o áudio não
+        sustenta). Num teste offline, o termo certo subiu 8 a 13 pontos sobre a correção do vocabulário sozinha; na
+        CPU da produção, WER 9,2% → 6,5%. **Adiciona ~0,29 s por turno** na CPU da produção (o reconhecimento lê o
+        arquivo da fala com um beam) e ainda não vale nos caminhos em streaming. Vale sobretudo com
+        ``transcription_priority="latency"``, em que o texto do turno é o do reconhecimento rápido.
+
+        ``guardrails`` (motor 0.5.3; desligado por padrão): checagens da fala do cliente e das falas do agente. Ex.:
+        ``{"business": "Pizzaria", "caller": {"checks": ["injection", "abuse"]}, "agent": {"mode": "block",
+        "rules": ["Nunca prometa desconto"]}, "fallback": "Nisso não consigo ajudar."}``. As do cliente vão na mesma
+        avaliação da decisão (**sem latência a mais**) e chegam em ``Decision.guardrails``; as do agente, em
+        ``"audit"``, só avisam (evento :class:`ermis.Guardrail`), e em ``"block"`` checam antes de tocar (**~0,2 s a
+        mais por fala checada**) e trocam a fala reprovada pelo ``fallback``. ``speak(check=False)`` pula uma fala.
+
+        ``ask_again_on_ambiguous_stt``, na CPU da produção: as N leituras custam ~0,2 s por turno quando o
+        reconhecimento rápido lê o arquivo da fala (+26 ms em streaming).
         """
         body = session_body(
             transport=transport,
@@ -139,6 +229,8 @@ class _Sessions:
             transcription_priority=transcription_priority,
             precise_wait_ms=precise_wait_ms,
             turn_detection=turn_detection,
+            end_of_turn=end_of_turn,
+            ask_again_on_ambiguous_stt=ask_again_on_ambiguous_stt,
             early_turn=early_turn,
             custom_intents=custom_intents,
             vocabulary=vocabulary,
@@ -148,8 +240,14 @@ class _Sessions:
             waiting=waiting,
             max_duration_s=max_duration_s,
             metadata=metadata,
+            dtmf=dtmf,
+            echo=echo,
+            monitoring=monitoring,
+            profile=profile,
+            hotwords_in_stt=hotwords_in_stt,
+            guardrails=guardrails,
         )
-        data = await self._client._request("POST", "/v1/voice/sessions", json=body)
+        data = await self._client._request("POST", f"{VOICE_PATH}/sessions", json=body)
         return Session(
             session_id=data["session_id"],
             audio_url=data["audio_url"],
@@ -160,11 +258,33 @@ class _Sessions:
 
     async def get(self, session_id: str) -> dict[str, Any]:
         """Estado da sessão e segundos cobrados até agora."""
-        return await self._client._request("GET", f"/v1/voice/sessions/{session_id}")
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}")
 
     async def end(self, session_id: str) -> None:
         """Encerra a sessão pelo REST (o mesmo que ``call.end()`` no canal de controle)."""
-        await self._client._request("DELETE", f"/v1/voice/sessions/{session_id}")
+        await self._client._request("DELETE", f"{VOICE_PATH}/sessions/{session_id}")
+
+    async def monitoring(self, session_id: str) -> dict[str, Any]:
+        """O que a ligação guardou (``monitoring``), depois que ela terminou: ``metrics`` e ``conversation``.
+
+        ``metrics``: ``call`` (duração, créditos, motivo do fim), ``talk`` (fala de cada lado, silêncio), ``turns``,
+        ``latency_ms`` (cada etapa: ``count``, ``mean``, ``p50``, ``p90``, ``max``), ``understanding``, ``slots``,
+        ``interruptions``, ``waiting``, ``line``, ``dtmf``, ``errors``. ``conversation``: as falas, com ``t`` (segundos
+        desde o início do áudio), ``speaker`` (``"caller"`` ou ``"agent"``) e ``text``. Sessão ainda em andamento:
+        ``APIError`` com ``status`` 409; sem monitoramento, ou de outra chave: ``status`` 404.
+        """
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring")
+
+    async def monitoring_audio(self, session_id: str) -> bytes:
+        """O áudio da ligação: WAV, 8 kHz, dois canais (esquerda: o cliente; direita: o agente)."""
+        return await self._client._request("GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring/audio.wav", raw=True)
+
+    async def monitoring_transcript(self, session_id: str) -> str:
+        """A conversa em texto, uma linha por fala, com o tempo (``[00:03.90] Cliente: ...``)."""
+        data = await self._client._request(
+            "GET", f"{VOICE_PATH}/sessions/{session_id}/monitoring/conversation.txt", raw=True
+        )
+        return data.decode("utf-8")
 
 
 class Ermis:
@@ -204,9 +324,10 @@ class Ermis:
         return self.api_key.startswith("ek_test_")
 
     def _auth(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.api_key}"}
+        # O User-Agent diz a versão do SDK: numa rota de outra versão, a API responde qual instalar
+        return {"Authorization": f"Bearer {self.api_key}", "User-Agent": USER_AGENT}
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _request(self, method: str, path: str, *, raw: bool = False, **kwargs: Any) -> Any:
         try:
             resp = await self._http.request(method, path, headers=self._auth(), **kwargs)
         except httpx.TransportError as exc:  # endereço errado, sem rede, DNS: diz onde tentou e o que conferir
@@ -223,6 +344,8 @@ class Ermis:
             except ValueError:
                 message = resp.text
             raise from_http(resp.status_code, message, code=code, request_id=resp.headers.get("x-request-id"))
+        if raw:
+            return resp.content
         return resp.json() if resp.content else None
 
     async def usage(self, *, limit: int = 50, before: int | None = None) -> dict[str, Any]:

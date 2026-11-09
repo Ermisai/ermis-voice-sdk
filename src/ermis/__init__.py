@@ -5,6 +5,8 @@ Este SDK é a ponte do seu backend até ela: cria sessões e entrega os eventos
 da ligação como objetos Python, com métodos para mandar o agente agir.
 """
 
+from ._version import API_VERSION
+from ._version import __version__ as __version__
 from .call import Call, CustomIntent, Question
 from .client import Ermis, Session, Voice
 from .errors import (
@@ -20,12 +22,15 @@ from .errors import (
     SessionTimeoutError,
 )
 from .events import (
+    SLOT_FAILURE_REASONS,
     Assessment,
     Audio,
     BargeIn,
     Decision,
+    Dtmf,
     ErrorEvent,
     Event,
+    Guardrail,
     NoiseCalibrated,
     NoReply,
     ReplyTimeout,
@@ -48,9 +53,8 @@ from .events import (
 from .options import BargeInOptions, VadOptions, WaitingOptions
 from .speech_text import normalize_for_speech, number_to_words
 
-__version__ = "0.4.1a1"
-
 __all__ = [
+    "API_VERSION",
     "APIError",
     "Assessment",
     "Audio",
@@ -78,7 +82,10 @@ __all__ = [
     "SessionEnded",
     "SessionStarted",
     "SessionTimeoutError",
+    "SLOT_FAILURE_REASONS",
     "SlotResult",
+    "Dtmf",
+    "Guardrail",
     "SpeakDone",
     "SpeakStarted",
     "SpeechEnded",

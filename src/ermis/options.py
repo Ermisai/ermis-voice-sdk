@@ -80,6 +80,39 @@ class VadOptions:
 
 Transport = Literal["twilio", "browser", "websocket"]
 AudioFormat = Literal["mulaw_8k", "pcm16_48k"]
+EndOfTurn = Literal["fast", "balanced", "patient"]
+"""Quanto a Ermis espera depois que o cliente para de falar, antes de responder (``end_of_turn``).
+
+Troca latência por acurácia; medido em fala humana ao telefone (português, 8 kHz):
+
+- ``"fast"``: 0,43 s em média até o fim do turno; 42% das pausas de quem ia continuar viram fim de turno.
+- ``"balanced"`` (padrão no motor 0.5.0): **+0,16 s em todo turno** em relação ao ``"fast"`` (0,60 s); 23% das pausas.
+- ``"patient"``: **+0,37 s em todo turno** (0,80 s); 9% das pausas.
+
+Sem ``end_of_turn``, vale o padrão da versão do motor: ``"balanced"`` no 0.5.0, ``"fast"`` até o 0.4.9. Os campos
+``vad`` e ``early_turn`` que você mandar ganham do perfil (não mande ``early_turn.close_on_complete_text`` se quiser
+que o perfil decida).
+"""
+
+Profile = Literal["latency", "balanced", "accuracy"]
+"""Perfil da sessão (motor 0.5.3, ``profile``): uma combinação medida de ``end_of_turn``, ``transcription_priority``,
+``precise_wait_ms`` e ``early_turn``, para escolher de uma vez o lado da troca entre latência e acurácia. Os campos
+que você mandar ganham do perfil; o perfil ganha dos padrões do servidor. Sem perfil, cada campo tem o seu padrão.
+
+- ``"latency"``: ``end_of_turn="fast"``, ``transcription_priority="latency"``, ``precise_wait_ms=500``,
+  ``early_turn={"speculate": True, "close_on_complete_text": True}``. URA e respostas curtas numa linha boa: o turno
+  fecha cedo e segue com o texto do reconhecimento rápido. −0,14 s por turno na bateria; 8 ligações por máquina na
+  CPU da produção (6 nos outros). **Mais cortes** em quem pausa no meio da frase (42% das pausas em fala humana) e
+  mais dado ditado errado com ruído (+11 pontos na bateria).
+- ``"balanced"`` (o padrão do 0.5.3): ``end_of_turn="balanced"``, ``transcription_priority="balanced"``,
+  ``early_turn={"speculate": True}``. As duas leituras do áudio em todo turno; o trabalho da pausa adiantado.
+- ``"accuracy"``: ``end_of_turn="patient"``, ``transcription_priority="accuracy"``, ``early_turn={"speculate": True}``.
+  Quem pausa e dita dados, linhas ruidosas, público idoso: a espera do fim de turno ~0,2 s maior (na bateria, +0,1 s
+  por turno, não significativo), a conferência das falas duvidosas pela Camada 2; menos falas cortadas (11,5%
+  contra 16,7%) e fim certo +18 pontos em quem dita dados.
+
+Os números de latência e qualidade de cada perfil estão na documentação da API ("Latência × acurácia").
+"""
 
 
 def session_body(
@@ -93,6 +126,8 @@ def session_body(
     transcription_priority: Literal["balanced", "latency", "accuracy", "local_first", "local_only"] = UNSET,
     precise_wait_ms: int = UNSET,
     turn_detection: Literal["smart_turn", "silence"] = UNSET,
+    end_of_turn: EndOfTurn = UNSET,
+    ask_again_on_ambiguous_stt: bool | None = UNSET,
     early_turn: dict[str, Any] = UNSET,
     custom_intents: list[Any] = UNSET,
     vocabulary: list[str] = UNSET,
@@ -102,8 +137,20 @@ def session_body(
     waiting: WaitingOptions | dict[str, Any] = UNSET,
     max_duration_s: int = UNSET,
     metadata: dict[str, Any] = UNSET,
+    dtmf: bool | None = UNSET,
+    echo: dict[str, Any] = UNSET,
+    monitoring: bool = UNSET,
+    profile: Profile = UNSET,
+    hotwords_in_stt: bool | None = UNSET,
+    guardrails: dict[str, Any] = UNSET,
 ) -> dict[str, Any]:
-    """Monta o corpo JSON de criação de sessão, sem os campos não informados."""
+    """Monta o corpo JSON de criação de sessão, sem os campos não informados.
+
+    ``end_of_turn``: ver :data:`EndOfTurn` (**adiciona latência** fora de ``"fast"``: +0,16 s ou +0,37 s por turno;
+    padrão ``"balanced"`` no motor 0.5.0).
+    ``ask_again_on_ambiguous_stt``: ver ``Sessions.create`` (**adiciona latência**: +5 a +30 ms por turno, às vezes
+    uma decisão a mais, ~0,2 s, e perguntas a mais).
+    """
     raw = {
         "transport": transport,
         "audio_format": audio_format,
@@ -114,6 +161,8 @@ def session_body(
         "transcription_priority": transcription_priority,
         "precise_wait_ms": precise_wait_ms,
         "turn_detection": turn_detection,
+        "end_of_turn": end_of_turn,
+        "ask_again_on_ambiguous_stt": ask_again_on_ambiguous_stt,
         "early_turn": early_turn,
         "custom_intents": custom_intents
         if custom_intents is UNSET
@@ -125,6 +174,12 @@ def session_body(
         "waiting": waiting,
         "max_duration_s": max_duration_s,
         "metadata": metadata,
+        "dtmf": dtmf,
+        "echo": echo,
+        "monitoring": monitoring,
+        "profile": profile,
+        "hotwords_in_stt": hotwords_in_stt,
+        "guardrails": guardrails,
     }
     body: dict[str, Any] = {}
     for key, value in raw.items():
