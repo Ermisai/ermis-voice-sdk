@@ -121,6 +121,8 @@ Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do moto
 
 ### Criar sessão
 
+O jeito mais simples de escolher entre velocidade e precisão é o campo `profile` ([perfis](#perfis-profile)). Sem ele, a sessão usa o perfil padrão do servidor: na API hospedada, hoje, `latency`. Os campos de fim de turno e de transcrição desta tabela que você mandar ganham do perfil; os padrões indicados abaixo valem para uma sessão sem perfil.
+
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `transport` | string | `websocket` | Como o áudio chega: `twilio`, `browser` ou `websocket` ([detalhes](#conectando-o-áudio)) |
@@ -149,7 +151,7 @@ Base: `https://voice-api.live.ermis.ai`. As rotas de voz levam a versão do moto
 | `dtmf` | booleano ou `null` | no Twilio, ligado | As teclas do cliente chegam à Ermis (evento `dtmf`; um `expect_slot` com `dtmf: true` aceita o dado digitado). No `websocket` e no navegador, `true` quando a sua telefonia manda as teclas (`{"type": "dtmf"}`) |
 | `echo` | objeto | ligado no motor 0.5.3 | A voz do próprio agente voltando pela linha (navegador sem cancelamento de eco, viva-voz) não o interrompe; o cliente falando por cima continua interrompendo. `{"enabled": false}` desliga. Sem custo de latência |
 | `monitoring` | booleano | `true` | Guarda a ligação quando ela termina: áudio em dois canais, conversa e métricas ([ver abaixo](#monitoramento-das-ligações)). `false`: nada desta ligação fica guardado |
-| `profile` | string | nenhum | Motor 0.5.3: `latency`, `balanced` ou `accuracy`, uma combinação medida de `end_of_turn`, `transcription_priority`, `precise_wait_ms` e `early_turn`. Os campos que você mandar ganham do perfil |
+| `profile` | string | o do servidor (na API hospedada, `latency`) | Motor 0.5.3: `latency`, `balanced` ou `accuracy`. Escolhe de uma vez o fim de turno (`end_of_turn`, `early_turn`), a espera pela transcrição de maior qualidade (`transcription_priority`, `precise_wait_ms`) e o nível da voz ([perfis](#perfis-profile)). Os campos que você mandar ganham do perfil |
 | `hotwords_in_stt` | booleano | `false` | Motor 0.5.3: o `vocabulary` também orienta o reconhecimento rápido. **Adiciona ~0,29 s por turno** |
 | `guardrails` | objeto | desligado | Motor 0.5.3: checagens da fala do cliente e das falas do agente ([ver abaixo](#guardrails)) |
 
@@ -169,7 +171,7 @@ Resposta `201`: `session_id`, `audio_url`, `control_url`, `session_token`.
 }
 ```
 
-A mesma voz fala em dois níveis, escolhidos pela prioridade da sessão: com `transcription_priority` igual a `latency`, o mais rápido (primeiro áudio em ~50–85 ms); nas demais, o de mais qualidade (~120–210 ms). `man` e `woman`, os nomes de antes (até a API 0.3), continuam aceitos como Alex e Sarah.
+A mesma voz fala em níveis diferentes, escolhidos pelo perfil da sessão: com `latency`, o mais leve e rápido (o primeiro áudio sai antes); com `accuracy`, o mais natural; com `balanced`, um equilíbrio entre velocidade e naturalidade. Sem `profile`, vale o perfil padrão do servidor (ou, quando a sessão manda `transcription_priority`, o nível que combina com ela). `man` e `woman`, os nomes de antes (até a API 0.3), continuam aceitos como Alex e Sarah.
 
 Vozes com `production: false` servem só para testes e não devem ser usadas com clientes reais. Sem `voice`, a sessão usa a voz `default`.
 
@@ -609,10 +611,29 @@ Até 20 comandos por segundo por sessão. Ao atingir o limite de créditos duran
 
 Os ajustes abaixo são campos da criação da sessão (`POST /v1/voice/sessions`) ou atitudes da sua aplicação. Teste com ligações reais do seu público: o melhor ajuste depende de como seus clientes falam e de onde ligam.
 
+### Perfis (`profile`)
+
+Motor 0.5.3. Com `"profile"`, você escolhe de uma vez o lado da troca entre velocidade e precisão: quando o turno do cliente termina, quanto a transcrição espera a leitura de maior qualidade e qual nível da voz o agente usa.
+
+| Perfil | O que faz | Ganha | Custa | Use em |
+|---|---|---|---|---|
+| `latency` | O turno fecha cedo (inclusive quando o texto já é um pedido completo); a conversa segue com a transcrição rápida, sem esperar a leitura de maior qualidade (só as respostas que você marcou como importantes esperam um pouco); voz mais leve e rápida | A resposta mais rápida | Mais cortes em quem pausa no meio da frase; mais erros em dados ditados, sobretudo numa linha ruidosa | URA, menus, respostas curtas numa linha boa |
+| `balanced` | As duas leituras de cada fala, com uma espera curta e limitada pela de maior qualidade; o trabalho do turno adiantado durante a pausa; voz equilibrada entre velocidade e naturalidade | Um bom meio-termo | Um pouco mais de espera que `latency` | A maioria dos atendimentos |
+| `accuracy` | Fim de turno paciente; as falas duvidosas são conferidas antes de seguir; a voz mais natural | Menos clientes cortados, dados ditados mais certos | Um pouco mais de espera em cada turno | Ditado de dados (CPF, endereço), linha ruidosa, público idoso ou que hesita |
+
+**Padrão:** sem `profile`, vale o perfil padrão do servidor; na API hospedada da Ermis, hoje, `latency`. Para não depender do padrão, mande o perfil explicitamente.
+
+**Como escolher:** na API, `{"profile": "accuracy", ...}` no `POST /v1/voice/sessions`; no SDK Python, `await ermis.sessions.create(..., profile="accuracy")`.
+
+**Campos explícitos ganham do perfil.** O perfil só preenche o que a sessão não mandou: `{"profile": "accuracy", "vad": {"min_silence_ms": 800}}` usa o perfil paciente com 800 ms de silêncio; `{"profile": "latency", "transcription_priority": "balanced"}` fecha o turno cedo mas espera as duas leituras. Em `early_turn`, cada subcampo que você mandar ganha do perfil, e os outros vêm dele.
+
+Precisão só onde importa: em vez de deixar a ligação inteira mais lenta, mantenha `latency` ou `balanced` e peça a leitura de maior qualidade só na resposta que precisa dela (`precise`, `expect_slot`).
+
 ### Quero a menor latência possível. O que ajustar?
 
 | Ajuste | Efeito | Custo |
 |---|---|---|
+| `"profile": "latency"` | O turno fecha cedo, a transcrição não espera a leitura de maior qualidade e a voz é a mais rápida ([perfis](#perfis-profile)) | Mais cortes em quem pausa; mais erros em dados ditados |
 | `"transcription_priority": "latency"` | A transcrição sai assim que o reconhecimento rápido tem texto, sem esperar a leitura de maior qualidade (cerca de 150 ms a menos por fala). Com `precise_wait_ms`, as respostas que você marcou como importantes (`precise`, `slot`) esperam essa leitura por até esse tempo | Mais erros em nomes, números e frases longas |
 | `vad.min_silence_ms` entre `300` e `350` | O turno fecha mais cedo depois que o cliente para de falar | Clientes que fazem pausas no meio da frase são cortados |
 | Respostas prontas para `action: "respond"` | Cumprimentos, agradecimentos e despedidas sem passar pela sua IA | — |
@@ -624,13 +645,14 @@ A maior parte da espera numa conversa costuma ser a sua IA. Se ela leva mais de 
 
 | Ajuste | Efeito | Custo |
 |---|---|---|
+| `"profile": "accuracy"` | Fim de turno paciente, falas duvidosas conferidas e a voz mais natural ([perfis](#perfis-profile)) | Um pouco mais de espera em cada turno |
 | `"transcription_priority": "accuracy"` | Quando a transcrição é incerta, a Ermis confere se o texto faz sentido como resposta ao que o agente perguntou, antes de pedir confirmação | Uma verificação extra nas falas duvidosas (~0,3 s) |
 | `vad.min_silence_ms` entre `600` e `800` | Não corta quem fala devagar ou faz pausas (idosos, ditado de números) | O turno demora mais para fechar |
 | `extract_slot` para e-mail, telefone, CPF, data e nome | A Ermis interpreta o dado ditado ("ana arroba gmail ponto com") em vez de você tratar o texto | — |
 | Confirmar quando `assessment.confirm` vier `true` | Evita gravar um dado errado | Uma pergunta a mais |
 | `"calibrate": true` na primeira fala | A Ermis mede o ruído de fundo enquanto o cliente ouve a saudação | — |
 
-O padrão, `"balanced"`, espera as duas leituras do áudio e escolhe a melhor; é o recomendado para a maioria dos casos.
+Para a maioria dos casos, recomendamos `"profile": "balanced"`: as duas leituras do áudio, a melhor escolhida, com espera limitada.
 
 ### O cliente fala "tchau" e a ligação não termina
 

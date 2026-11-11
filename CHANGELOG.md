@@ -1,5 +1,11 @@
 # Changelog
 
+## Não lançado
+
+- Documentação dos perfis de sessão (`profile`): o que cada um faz, quando usar, o padrão (o do servidor; na API
+  hospedada, `latency`) e os campos explícitos que ganham do perfil, em `docs/api.md` ("Perfis"), no README, no
+  docstring de `ermis.options.Profile` e no prompt para IA. Os exemplos da URA e da clínica passam a usar `profile`.
+
 ## 0.5.3
 
 Requer a Ermis Voice API 0.5.3 (publique o SDK só depois dela). O SDK 0.5.3 fala com `/v1/voice/v0.5.3/...`.

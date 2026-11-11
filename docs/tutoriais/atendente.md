@@ -211,39 +211,25 @@ No navegador, a principal causa é o eco: use `echoCancellation: true` e, nos te
 
 ## 5. Qualidade e latência
 
-Cada fala do cliente passa por três etapas: perceber que ele **terminou de falar**, **transcrever** o que ele disse e **responder**. Cada etapa tem um ajuste que troca velocidade por precisão. A clínica guarda três perfis prontos e escolhe um pela variável `PERFIL`:
+Cada fala do cliente passa por três etapas: perceber que ele **terminou de falar**, **transcrever** o que ele disse e **responder**. Cada etapa tem um ajuste que troca velocidade por precisão, e o campo `profile` escolhe de uma vez o fim de turno, a espera da transcrição e o nível da voz (`latency`, `balanced` ou `accuracy`; ver [Perfis](../api.md#perfis-profile)). Sem ele, vale o perfil padrão do servidor (na API hospedada, hoje, `latency`). A clínica guarda três perfis prontos e escolhe um pela variável `PERFIL`:
 
 ```python
 PERFIS = {
-    # URA e respostas curtas: o turno fecha cedo e a transcrição não espera a leitura de maior qualidade
-    "rapido": {
-        "transcription_priority": "latency",
-        "turn_detection": "smart_turn",
-        "early_turn": {"speculate": True, "close_on_complete_text": True},
-        "vad": {"min_silence_ms": 350},
-    },
-    # O padrão recomendado: as duas leituras do áudio, a melhor escolhida
-    "equilibrado": {
-        "transcription_priority": "balanced",
-        "turn_detection": "smart_turn",
-        "early_turn": {"speculate": True},
-    },
-    # Público que fala devagar, dita números ou liga de lugares barulhentos
-    "preciso": {
-        "transcription_priority": "accuracy",
-        "turn_detection": "smart_turn",
-        "vad": {"min_silence_ms": 700},
-        "barge_in": {"min_speech_ms": 300},
-    },
+    # URA e respostas curtas: o turno fecha cedo, a transcrição rápida segue sem esperar e a voz é a mais rápida
+    "rapido": {"profile": "latency"},
+    # A maioria dos atendimentos: as duas leituras de cada fala, com espera limitada
+    "equilibrado": {"profile": "balanced"},
+    # Público que fala devagar, dita números ou liga de lugares barulhentos: fim de turno paciente, a voz mais natural
+    "preciso": {"profile": "accuracy", "barge_in": {"min_speech_ms": 300}},
 }
 PERFIL = PERFIS[os.environ.get("PERFIL", "equilibrado")]
 
 await ermis.sessions.create(..., **PERFIL)
 ```
 
-O que cada ajuste faz:
+Os campos que você mandar ganham do perfil: o `preciso` acima usa o perfil `accuracy` e só muda quanto o cliente precisa falar para interromper o agente. Para afinar além do perfil, os ajustes um a um:
 
-| Ajuste | Mais rápido | Padrão | Mais preciso |
+| Ajuste | Mais rápido | Meio-termo | Mais preciso |
 |---|---|---|---|
 | `transcription_priority` | `"latency"`: o texto sai assim que o reconhecimento rápido termina (cerca de 150 ms a menos por fala) | `"balanced"`: espera as duas leituras do áudio e escolhe a melhor | `"accuracy"`: confere as falas duvidosas antes de pedir confirmação (cerca de 0,3 s a mais, só nelas) |
 | `vad.min_silence_ms` (silêncio que fecha a fala) | `300` a `350`: fecha mais cedo, mas corta quem faz pausas | `400` | `600` a `800`: espera quem fala devagar ou dita números |

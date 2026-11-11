@@ -54,6 +54,7 @@ Cliente:
 - `Ermis(api_key=None, *, base_url=None, timeout=10.0)`; feche com `await ermis.aclose()`.
 - `await ermis.sessions.create(*, transport="twilio", voice=..., auto_decide=True,
   custom_intents=[CustomIntent(key, label, description), ...], vocabulary=["palavra", ...],
+  profile="latency" | "balanced" | "accuracy",
   transcription_priority="balanced" | "latency" | "accuracy" | "local_first" | "local_only",
   turn_detection="smart_turn" | "silence", early_turn={"speculate": True, "close_on_complete_text": True},
   vad=VadOptions(min_silence_ms=...), barge_in=BargeInOptions(enabled=..., min_speech_ms=...),
@@ -61,6 +62,9 @@ Cliente:
   opcionais. `custom_intents`: as intenções do meu negócio; cada `Decision` já traz em `custom_intent` a
   escolhida, sem chamada extra. `vocabulary`: palavras do meu negócio (produtos, sabores, serviços); a
   transcrição chega corrigida na direção delas. `voice`: um `id` de `await ermis.voices.list()`.
+  `profile`: a troca entre velocidade e precisão de uma vez (`latency`: URA e respostas curtas; `balanced`: a
+  maioria dos atendimentos; `accuracy`: ditado, linha ruidosa, público idoso); sem ele, vale o padrão do servidor
+  (na API hospedada, `latency`), e os campos que eu mandar ganham dele.
 - `Session`: `session_id`, `audio_url`, `control_url`, `session_token`; `session.twiml() -> str` (o TwiML
   pronto para responder ao Twilio).
 - `ermis.connect(session_ou_control_url, normalize_text=True)` é um gerenciador assíncrono:

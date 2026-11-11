@@ -95,23 +95,22 @@ que o perfil decida).
 """
 
 Profile = Literal["latency", "balanced", "accuracy"]
-"""Perfil da sessão (motor 0.5.3, ``profile``): uma combinação medida de ``end_of_turn``, ``transcription_priority``,
-``precise_wait_ms`` e ``early_turn``, para escolher de uma vez o lado da troca entre latência e acurácia. Os campos
-que você mandar ganham do perfil; o perfil ganha dos padrões do servidor. Sem perfil, cada campo tem o seu padrão.
+"""Perfil da sessão (motor 0.5.3, ``profile``): uma escolha só para a troca inteira entre velocidade e precisão. O
+perfil decide quando o turno do cliente termina, quanto a transcrição espera a leitura de maior qualidade e qual
+nível da voz o agente usa.
 
-- ``"latency"``: ``end_of_turn="fast"``, ``transcription_priority="latency"``, ``precise_wait_ms=500``,
-  ``early_turn={"speculate": True, "close_on_complete_text": True}``. URA e respostas curtas numa linha boa: o turno
-  fecha cedo e segue com o texto do reconhecimento rápido. −0,14 s por turno na bateria; 8 ligações por máquina na
-  CPU da produção (6 nos outros). **Mais cortes** em quem pausa no meio da frase (42% das pausas em fala humana) e
-  mais dado ditado errado com ruído (+11 pontos na bateria).
-- ``"balanced"`` (o padrão do 0.5.3): ``end_of_turn="balanced"``, ``transcription_priority="balanced"``,
-  ``early_turn={"speculate": True}``. As duas leituras do áudio em todo turno; o trabalho da pausa adiantado.
-- ``"accuracy"``: ``end_of_turn="patient"``, ``transcription_priority="accuracy"``, ``early_turn={"speculate": True}``.
-  Quem pausa e dita dados, linhas ruidosas, público idoso: a espera do fim de turno ~0,2 s maior (na bateria, +0,1 s
-  por turno, não significativo), a conferência das falas duvidosas pela Camada 2; menos falas cortadas (11,5%
-  contra 16,7%) e fim certo +18 pontos em quem dita dados.
+- ``"latency"``: o turno fecha cedo, a conversa segue com a transcrição rápida (sem esperar a leitura de maior
+  qualidade) e a voz é a mais leve e rápida. Para URA, menus e respostas curtas numa linha boa. Custo: mais cortes em
+  quem pausa no meio da frase e mais erros em dados ditados numa linha ruidosa.
+- ``"balanced"``: as duas leituras de cada fala, com uma espera curta e limitada pela de maior qualidade, e uma voz
+  equilibrada entre velocidade e naturalidade. Para a maioria dos atendimentos.
+- ``"accuracy"``: o fim de turno é paciente, as falas duvidosas são conferidas antes de seguir e a voz é a mais
+  natural. Para ditado de dados, linhas ruidosas e público idoso ou que hesita. Custo: um pouco mais de espera em
+  cada turno.
 
-Os números de latência e qualidade de cada perfil estão na documentação da API ("Latência × acurácia").
+Sem ``profile``, vale o perfil padrão do servidor (na API hospedada da Ermis, hoje, ``"latency"``). Os campos que você mandar
+(``end_of_turn``, ``transcription_priority``, ``precise_wait_ms``, ``early_turn``, ``vad``...) ganham do perfil: por
+exemplo, ``profile="accuracy", vad=VadOptions(min_silence_ms=800)``. Ver "Perfis" na documentação da API.
 """
 
 

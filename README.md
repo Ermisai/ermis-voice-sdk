@@ -152,6 +152,12 @@ Cliente assíncrono. Sem `api_key`, lê `ERMIS_API_KEY`; sem `base_url`, lê `ER
 **Opções de `sessions.create`** (todas opcionais; o que você não passar usa o padrão da API):
 `transport` (`"twilio"`, `"browser"`, `"websocket"`), `audio_format` (`"mulaw_8k"`, `"pcm16_48k"`), `language`, `voice` (um `id` de `voices.list()`), `auto_decide`, `transcription_priority` (`"balanced"`, `"latency"`, `"accuracy"`, `"local_first"`, `"local_only"`), `turn_detection` (`"smart_turn"`, `"silence"`), `end_of_turn` (`"fast"`, `"balanced"`, `"patient"`), `ask_again_on_ambiguous_stt`, `early_turn={"speculate": True, "close_on_complete_text": True}`, `custom_intents=[CustomIntent(…)]` (as intenções do seu negócio, respondidas em cada `Decision`), `vocabulary=[…]` (palavras do seu negócio: a transcrição chega corrigida), `vad=VadOptions(min_silence_ms=…)`, `barge_in=BargeInOptions(enabled=…, min_speech_ms=…)`, `waiting=WaitingOptions(…)`, `max_duration_s`, `metadata`, `dtmf`, `echo`, `profile`, `hotwords_in_stt`, `guardrails`, `monitoring` (padrão `True`: a ligação fica guardada, com áudio, conversa e métricas; leia com `sessions.monitoring()`).
 
+**Perfil da sessão** (`profile`, motor 0.5.3): uma escolha só para a troca entre velocidade e precisão. `"latency"`: o turno fecha cedo, a transcrição rápida segue sem esperar e a voz é a mais leve e rápida (URA, menus, respostas curtas). `"balanced"`: as duas leituras de cada fala, com espera limitada, e uma voz equilibrada entre velocidade e naturalidade (a maioria dos atendimentos). `"accuracy"`: fim de turno paciente, falas duvidosas conferidas e a voz mais natural (ditado de dados, linha ruidosa, público idoso). Sem `profile`, vale o padrão do servidor (na API hospedada, hoje, `"latency"`). Os campos que você mandar (`end_of_turn`, `transcription_priority`, `vad`, `early_turn`...) ganham do perfil. Detalhes em [Perfis](https://github.com/Ermisai/ermis-voice-sdk/blob/main/docs/api.md#perfis-profile).
+
+```python
+session = await ermis.sessions.create(transport="twilio", profile="accuracy")  # quem dita CPF e endereço
+```
+
 ```python
 from ermis import WaitingOptions
 

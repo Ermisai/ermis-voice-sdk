@@ -148,7 +148,7 @@ async def ligacao_recebida(CallSid: str = Form(...)) -> Response:  # noqa: N803 
     session = await ermis.sessions.create(
         transport="twilio",
         voice="Sarah",
-        transcription_priority="latency",  # numa URA, responder rápido importa mais que cada palavra
+        profile="latency",  # numa URA, responder rápido importa mais que cada palavra
         custom_intents=SETORES,  # cada Decision já traz o setor em custom_intent
         metadata={"call_sid": CallSid, "fluxo": "ura"},
     )

@@ -73,11 +73,13 @@ Numa URA, a resposta do cliente é curta e o agente só precisa do setor. Respon
 session = await ermis.sessions.create(
     transport="twilio",
     voice="Sarah",
-    transcription_priority="latency",   # o texto sai assim que o reconhecimento rápido termina
+    profile="latency",                  # o turno fecha cedo e o texto rápido segue sem esperar
     custom_intents=SETORES,             # cada Decision já traz o setor em custom_intent
     metadata={"call_sid": CallSid, "fluxo": "ura"},
 )
 ```
+
+O perfil `latency` fecha o turno cedo, segue com a transcrição rápida e usa a voz mais rápida. Ele é o padrão da API hospedada hoje, mas mandá-lo deixa a URA independente do padrão do servidor.
 
 Se o seu público dita números longos na URA (contrato, protocolo), não aumente o silêncio da sessão inteira: peça só aquele dado com `expect_slot` (passo 5).
 

@@ -191,8 +191,10 @@ class _Sessions:
         guardado (use nas ligações que não podem ser gravadas). Sem custo de latência.
 
         ``profile`` (motor 0.5.3; ``"latency"``, ``"balanced"`` ou ``"accuracy"``; ver :data:`ermis.options.Profile`):
-        escolhe de uma vez ``end_of_turn``, ``transcription_priority``, ``precise_wait_ms`` e ``early_turn``. Os
-        campos que você mandar ganham dele.
+        escolhe de uma vez o fim de turno, a espera pela transcrição de maior qualidade e o nível da voz.
+        ``"latency"``: URA e respostas curtas; ``"balanced"``: a maioria dos atendimentos; ``"accuracy"``: ditado,
+        linha ruidosa, público idoso. Sem ele, vale o perfil padrão do servidor (na API hospedada, ``"latency"``).
+        Os campos que você mandar ganham dele.
 
         ``early_turn``: no motor 0.5.3 o padrão é ``{"speculate": True}``: a transcrição e a decisão começam na pausa
         do cliente e são descartadas se ele voltar a falar. **Sem custo de latência** (ela cai: −0,26 s por turno na

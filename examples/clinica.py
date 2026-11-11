@@ -56,26 +56,12 @@ MAIS_ALGO = "Posso ajudar em mais alguma coisa?"
 
 # ── Passo 5: qualidade x latência ───────────────────────────────────────────
 PERFIS = {
-    # URA e respostas curtas: o turno fecha cedo e a transcrição não espera a leitura de maior qualidade
-    "rapido": {
-        "transcription_priority": "latency",
-        "turn_detection": "smart_turn",
-        "early_turn": {"speculate": True, "close_on_complete_text": True},
-        "vad": {"min_silence_ms": 350},
-    },
-    # O padrão recomendado: as duas leituras do áudio, a melhor escolhida
-    "equilibrado": {
-        "transcription_priority": "balanced",
-        "turn_detection": "smart_turn",
-        "early_turn": {"speculate": True},
-    },
-    # Público que fala devagar, dita números ou liga de lugares barulhentos
-    "preciso": {
-        "transcription_priority": "accuracy",
-        "turn_detection": "smart_turn",
-        "vad": {"min_silence_ms": 700},
-        "barge_in": {"min_speech_ms": 300},
-    },
+    # URA e respostas curtas: o turno fecha cedo, a transcrição rápida segue sem esperar e a voz é a mais rápida
+    "rapido": {"profile": "latency"},
+    # A maioria dos atendimentos: as duas leituras de cada fala, com espera limitada
+    "equilibrado": {"profile": "balanced"},
+    # Público que fala devagar, dita números ou liga de lugares barulhentos: fim de turno paciente, a voz mais natural
+    "preciso": {"profile": "accuracy", "barge_in": {"min_speech_ms": 300}},
 }
 PERFIL = PERFIS[os.environ.get("PERFIL", "equilibrado")]
 
